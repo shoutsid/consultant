@@ -118,8 +118,14 @@ class LoopTest < Minitest::Test
         "summary" => "The suite passed and the only application edit is the serialize call in User.",
         "review_focus" => [{ "anchor" => "path:app/models/user.rb",
                              "why" => "the serialize call is the one behavioural change in this rung." }],
+        "narrative" => {
+          "what_moved" => "This rung moves the application from 7.0.0 to 7.1.0 and keeps the " \
+            "suite green in the only application change.",
+          "what_changed" => "The User model's serialize call changes and nothing else in the " \
+            "application does; the dependency set moves with the rung."
+        },
         "provenance" => { "model" => "provider/model",
-                          "prompt_version" => "presenter-prompt-1" }
+                          "prompt_version" => "presenter-prompt-2" }
       ))
       subject = loop(client: client, runner: runner, dir: dir)
 
@@ -129,6 +135,7 @@ class LoopTest < Minitest::Test
       assert client.calls.any? { |call| call.first == :presentation && call[1] == "run-1" }
       complete = client.calls.find { |call| call.first == :complete }
       assert_equal "path", complete[2][:result]["review_focus"].first["anchor"].split(":").first
+      assert_includes complete[2][:result].dig("narrative", "what_moved"), "This rung moves"
       assert_equal "presenter", runner.calls.first[:agent]
       refute client.calls.any? { |call| call.first == :answer }
     end

@@ -34,6 +34,10 @@ module Agents
       PRESENT_MAX_FOCUS = 5
       PRESENT_MIN_WHY = 20
       PRESENT_MAX_WHY = 300
+      PRESENT_MIN_NARRATIVE = 80
+      PRESENT_MAX_NARRATIVE = 1_800
+      PRESENT_MAX_NARRATIVE_TOTAL = 3_200
+      PRESENT_NARRATIVE_KEYS = %w[what_moved what_changed].freeze
 
       class Refusal < StandardError; end
 
@@ -275,13 +279,55 @@ module Agents
             return [nil, "a presentation needs provenance (model, prompt_version)"]
           end
 
+          narrative, narrative_problem = read_narrative(parsed["narrative"])
+          return [nil, narrative_problem] if narrative_problem
+
           [{
             "summary" => summary,
             "review_focus" => cleaned,
+            "narrative" => narrative,
             "provenance" => provenance.merge("harness" => "consultant/1")
           }, nil]
         rescue Refusal => e
           [nil, e.message]
+        end
+
+        # **The narratives are prose, and the service adds the headings.** This gate refuses a
+        # heading, list, table, link or secret before the request is sent; the service checks the
+        # claims, versions and anchors against the record. Both are required: a presenter that
+        # answers without them answered the previous version of the task.
+        def read_narrative(raw)
+          return [nil, "a presentation needs what_moved and what_changed narratives"] unless
+            raw.is_a?(Hash)
+
+          cleaned = {}
+          total = 0
+          PRESENT_NARRATIVE_KEYS.each do |key|
+            label = key.tr("_", " ")
+            text = raw[key].to_s.gsub(/\r\n?/, "\n").strip
+            if text.length < PRESENT_MIN_NARRATIVE || text.length > PRESENT_MAX_NARRATIVE
+              return [nil, "the #{label} narrative must be #{PRESENT_MIN_NARRATIVE} to " \
+                           "#{PRESENT_MAX_NARRATIVE} characters"]
+            end
+            return [nil, "the #{label} narrative carries raw HTML"] if
+              text.match?(/<\/?[A-Za-z][^>]*>/)
+            return [nil, "the #{label} narrative carries a heading"] if text.match?(/^\s*#/m)
+            if text.match?(/^\s*(?:[-*+>]\s|\|\s?|\d+\.\s)/m)
+              return [nil, "the #{label} narrative carries a list or a table; write prose paragraphs"]
+            end
+            return [nil, "the #{label} narrative carries a code fence"] if text.include?("```")
+            return [nil, "the #{label} narrative carries a Markdown link"] if text.include?("](")
+            return [nil, "the #{label} narrative carries a secret-looking value"] if secret?(text)
+
+            cleaned[key] = text
+            total += text.length
+          end
+          if total > PRESENT_MAX_NARRATIVE_TOTAL
+            return [nil, "the narrative is longer than #{PRESENT_MAX_NARRATIVE_TOTAL} characters " \
+                         "in total"]
+          end
+
+          [cleaned, nil]
         end
 
         def parse(text)

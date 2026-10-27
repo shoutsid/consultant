@@ -305,6 +305,7 @@ module Agents
         {
           "summary" => proposal["summary"].to_s,
           "review_focus" => Array(proposal["review_focus"]),
+          "narrative" => proposal["narrative"].is_a?(Hash) ? proposal["narrative"] : {},
           "provenance" => proposal["provenance"].merge("model" => model.to_s)
         }
       end

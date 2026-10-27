@@ -111,7 +111,9 @@ class PromptTest < Minitest::Test
     assert_includes text, "UNTRUSTED current body"
     assert_includes text, "UNTRUSTED fact sheet"
     assert_includes text, "UNTRUSTED run patch"
-    assert_includes text, "presenter-prompt-1"
+    assert_includes text, "presenter-prompt-2"
+    assert_includes text, "\"what_moved\""
+    assert_includes text, "\"what_changed\""
     assert_includes text, "Return the JSON object now."
   end
 

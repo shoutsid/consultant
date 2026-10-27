@@ -180,12 +180,20 @@ class ValidatorTest < Minitest::Test
 
   def presentation_text(summary: "The suite passed and the only application edit is the serialize call.",
     anchor: "path:app/models/user.rb",
-    why: "the serialize call is the one behavioural change in this rung.")
-    JSON.generate(
+    why: "the serialize call is the one behavioural change in this rung.",
+    narrative: {
+      "what_moved" => "This rung moves the application from 7.0.0 to 7.1.0 and keeps the suite " \
+        "green. The only application change is the serialize call in User.",
+      "what_changed" => "The User model's serialize call changes and nothing else in the " \
+        "application does; the dependency set moves with the rung."
+    })
+    payload = {
       "summary" => summary,
       "review_focus" => [{ "anchor" => anchor, "why" => why }],
-      "provenance" => { "model" => "test/model", "prompt_version" => "presenter-prompt-1" }
-    )
+      "provenance" => { "model" => "test/model", "prompt_version" => "presenter-prompt-2" }
+    }
+    payload["narrative"] = narrative unless narrative.nil?
+    JSON.generate(payload)
   end
 
   def test_a_presentation_is_read_as_typed_fields
@@ -193,7 +201,31 @@ class ValidatorTest < Minitest::Test
 
     assert_nil problem
     assert_equal "path:app/models/user.rb", proposal["review_focus"].first["anchor"]
+    assert_includes proposal.dig("narrative", "what_moved"), "This rung moves the application"
     assert_equal "consultant/1", proposal.dig("provenance", "harness")
+  end
+
+  def test_a_presentation_requires_both_narratives
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(narrative: { "what_moved" => "This rung moves the application from 7.0.0 " \
+        "to 7.1.0 and keeps the suite green in the only application change." })
+    )
+
+    assert_nil proposal
+    assert_match(/what changed/, problem)
+  end
+
+  def test_a_presentation_refuses_a_narrative_that_is_a_list
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(narrative: {
+        "what_moved" => "This rung moves the application from 7.0.0 to 7.1.0 and keeps the suite " \
+          "green. The only application change is the serialize call in User.",
+        "what_changed" => "- the User model's serialize call changes\n- the dependency set moves with the rung\n- nothing else in the application does"
+      })
+    )
+
+    assert_nil proposal
+    assert_match(/list or a table/, problem)
   end
 
   def test_a_presentation_refuses_an_untyped_anchor_and_a_short_summary
