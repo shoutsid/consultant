@@ -215,6 +215,43 @@ class ValidatorTest < Minitest::Test
     assert_match(/what changed/, problem)
   end
 
+  def test_a_presentation_refuses_a_narrative_that_carries_block_syntax
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(narrative: {
+        "what_moved" => "`## Checks` This rung moves the application from 7.0.0 to 7.1.0 and " \
+          "keeps the suite green in the only application change.",
+        "what_changed" => "The User model's serialize call changes and nothing else in the " \
+          "application does; the dependency set moves with the rung."
+      })
+    )
+    assert_nil proposal
+    assert_match(/code span or fence/, problem)
+
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(narrative: {
+        "what_moved" => "(path:app/models/user.rb) This rung moves the application from 7.0.0 " \
+          "to 7.1.0 and keeps the suite green in the only application change.",
+        "what_changed" => "The User model's serialize call changes and nothing else in the " \
+          "application does; the dependency set moves with the rung."
+      })
+    )
+    assert_nil proposal
+    assert_match(/typed anchor/, problem)
+  end
+
+  def test_a_presentation_refuses_a_non_text_narrative
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(narrative: {
+        "what_moved" => ["not", "text"],
+        "what_changed" => "The User model's serialize call changes and nothing else in the " \
+          "application does; the dependency set moves with the rung."
+      })
+    )
+
+    assert_nil proposal
+    assert_match(/must be text/, problem)
+  end
+
   def test_a_presentation_allows_a_narrative_that_starts_with_a_version
     text = presentation_text(narrative: {
       "what_moved" => "7.1.0 is the release this rung lands on, and the suite was green before " \

@@ -318,8 +318,19 @@ module Agents
             if text.match?(/^\s*(?:[-*+>]\s|\|\s?|\d+\.\s)/m)
               return [nil, "the #{label} narrative carries a list or a table; write prose paragraphs"]
             end
-            return [nil, "the #{label} narrative carries a code fence"] if text.include?("```")
-            return [nil, "the #{label} narrative carries a Markdown link"] if text.include?("](")
+            return [nil, "the #{label} narrative carries a code span or fence; write prose " \
+                         "without backticks"] if text.include?("`")
+            return [nil, "the #{label} narrative carries a code fence"] if
+              text.match?(/^\s{0,3}~{3,}/m)
+            return [nil, "the #{label} narrative carries a Setext underline"] if
+              text.match?(/^\s{0,3}(?:=+|-{2,})\s*$/m)
+            return [nil, "the #{label} narrative carries a Markdown link"] if
+              text.include?("](") || text.include?("][")
+            return [nil, "the #{label} narrative carries a reference link"] if
+              text.match?(/^\s{0,3}\[[^\]]+\]:/m)
+            return [nil, "the #{label} narrative carries a typed anchor; it belongs in " \
+                         "review_focus only"] if
+              text.match?(/\b(?:path|commit|decision|check|report|change):/)
             return [nil, "the #{label} narrative carries a secret-looking value"] if secret?(text)
 
             cleaned[key] = text
