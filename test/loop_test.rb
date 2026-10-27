@@ -4,7 +4,7 @@ require "minitest/autorun"
 require "json"
 require "tmpdir"
 
-require "agents_fyi/consultant"
+require "agents/consultant"
 
 class LoopTest < Minitest::Test
   class FakeClient
@@ -66,12 +66,12 @@ class LoopTest < Minitest::Test
   end
 
   def loop(client:, runner:, dir:)
-    config = AgentsFyi::Consultant::Config.new(
+    config = Agents::Consultant::Config.new(
       base_url: "http://service:8001", key: "afy_x", model: "provider/model",
       interval: 0, claim_limit: 1, kinds: %w[answer profile], task_timeout: 60,
       opencode_binary: "true", agent: "consultant", home: dir
     )
-    AgentsFyi::Consultant::Loop.new(client: client, runner: runner, config: config,
+    Agents::Consultant::Loop.new(client: client, runner: runner, config: config,
       out: StringIO.new, err: StringIO.new)
   end
 
@@ -112,7 +112,7 @@ class LoopTest < Minitest::Test
 
   def test_a_model_failure_is_reported_retryable
     Dir.mktmpdir do |dir|
-      error = AgentsFyi::Consultant::ModelError.new("timeout", retryable: true)
+      error = Agents::Consultant::ModelError.new("timeout", retryable: true)
       client = FakeClient.new
       subject = loop(client: client, runner: FakeRunner.new(error: error), dir: dir)
 
@@ -218,7 +218,7 @@ class LoopTest < Minitest::Test
         "evidence" => [{ "kind" => "run", "detail" => "the patch applies to the failing file" }],
         "rationale" => "the effect is the failure",
         "provenance" => { "model" => "provider/model", "agent" => "reviewer",
-                          "prompt_version" => "reviewer-prompt-1",
+                          "prompt_version" => "reviewer-prompt-2",
                           "files_read" => ["app/models/user.rb"] }
       )
       client = FakeClient.new

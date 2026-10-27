@@ -8,7 +8,7 @@ require "timeout"
 require_relative "errors"
 require_relative "validator"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **A read-only mirror of the project, in the consultant's own volume.**
     #

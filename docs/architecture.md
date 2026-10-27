@@ -27,14 +27,14 @@ a deployment with a broken key says so instead of retrying silently for ever.
 
 | File | What it decides |
 |---|---|
-| `lib/agents_fyi/consultant/config.rb` | The deployment's knobs, read once; the required URL and key, the model chain, the task kinds, the home. |
-| `lib/agents_fyi/consultant/client.rb` | The one HTTP client: control, claim, heartbeat, complete, fail, release, decisions, runs, profile proposals, reviews, usage. |
-| `lib/agents_fyi/consultant/prompt.rb` | The prompt text and the untrusted-content markers around report bodies and repository files. |
-| `lib/agents_fyi/consultant/validator.rb` | The boundary: what a model may propose and what it must refuse. |
-| `lib/agents_fyi/consultant/repository.rb` | The shallow, read-only public mirror, and `git show` for one file. |
-| `lib/agents_fyi/consultant/runner.rb` | Starts `opencode`, passes the prompt by file, parses the JSON and the token usage. |
-| `lib/agents_fyi/consultant/loop.rb` | The lease lifecycle and the task dispatch. |
-| `lib/agents_fyi/consultant/cli.rb` | `--once`, `--cycles`, `--tasks` and the exit status. |
+| `lib/agents/consultant/config.rb` | The deployment's knobs, read once; the required URL and key, the model chain, the task kinds, the home. |
+| `lib/agents/consultant/client.rb` | The one HTTP client: control, claim, heartbeat, complete, fail, release, decisions, runs, profile proposals, reviews, usage. |
+| `lib/agents/consultant/prompt.rb` | The prompt text and the untrusted-content markers around report bodies and repository files. |
+| `lib/agents/consultant/validator.rb` | The boundary: what a model may propose and what it must refuse. |
+| `lib/agents/consultant/repository.rb` | The shallow, read-only public mirror, and `git show` for one file. |
+| `lib/agents/consultant/runner.rb` | Starts `opencode`, passes the prompt by file, parses the JSON and the token usage. |
+| `lib/agents/consultant/loop.rb` | The lease lifecycle and the task dispatch. |
+| `lib/agents/consultant/cli.rb` | `--once`, `--cycles`, `--tasks` and the exit status. |
 
 ## The trust boundaries
 

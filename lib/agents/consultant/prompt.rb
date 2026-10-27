@@ -2,7 +2,7 @@
 
 require "json"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **The prompt is a reading of the service's own data, with the untrusted parts marked.**
     #
@@ -12,11 +12,11 @@ module AgentsFyi
     # prompt asks for one JSON object because the loop parses one object, and it names the exact
     # fields the service reads so a model does not invent a shape the service will refuse.
     module Prompt
-      VERSION = "consultant-prompt-5"
-      REVIEW_VERSION = "reviewer-prompt-1"
+      VERSION = "consultant-prompt-6"
+      REVIEW_VERSION = "reviewer-prompt-2"
 
       SYSTEM = <<~TEXT
-        You are the agents-fyi consultant. You read a decision an upgrade walk could not make and
+        You are the agents consultant. You read a decision an upgrade walk could not make and
         propose what to do about it. You do not execute anything, you do not accept your own
         proposal, and you do not write to an application's tree. A person and the deterministic walk
         decide what happens.
@@ -86,7 +86,7 @@ module AgentsFyi
       TEXT
 
       REVIEW_SYSTEM = <<~TEXT
-        You are the agents-fyi reviewer. You did not write the proposal under review. Your job is
+        You are the agents reviewer. You did not write the proposal under review. Your job is
         to decide whether the effect is right for the failure, not whether the proposer's rationale
         is persuasive. You do not execute anything, you do not accept the proposal, and you do not
         write to the application's tree.

@@ -2,7 +2,7 @@
 
 require "minitest/autorun"
 
-require "agents_fyi/consultant"
+require "agents/consultant"
 
 class PromptTest < Minitest::Test
   def task
@@ -23,14 +23,14 @@ class PromptTest < Minitest::Test
   end
 
   def test_the_prompt_says_an_answer_needs_a_typed_effect
-    text = AgentsFyi::Consultant::Prompt.build(task)
+    text = Agents::Consultant::Prompt.build(task)
 
     assert_includes text, "An `answer` must carry"
     assert_includes text, "a proposal with none is refused"
   end
 
   def test_the_question_and_the_policy_are_in_the_prompt_and_untrusted_text_is_marked
-    text = AgentsFyi::Consultant::Prompt.build(task)
+    text = Agents::Consultant::Prompt.build(task)
 
     assert_includes text, "Should the layout render the link?"
     assert_includes text, "UNTRUSTED context"
@@ -42,7 +42,7 @@ class PromptTest < Minitest::Test
   end
 
   def test_a_run_patch_and_the_existing_proposal_are_in_the_prompt
-    text = AgentsFyi::Consultant::Prompt.build(task, run: {
+    text = Agents::Consultant::Prompt.build(task, run: {
       "run" => { "verdict" => "passed", "from_version" => "7.0.10", "to_version" => "7.0.11" },
       "patch" => "--- a/app/models/user.rb\n+++ b/app/models/user.rb\n"
     })
@@ -52,7 +52,7 @@ class PromptTest < Minitest::Test
   end
 
   def test_a_repair_prompt_names_the_patch_payload_keys
-    text = AgentsFyi::Consultant::Prompt.build(task.merge("kind" => "repair"), mode: "repair")
+    text = Agents::Consultant::Prompt.build(task.merge("kind" => "repair"), mode: "repair")
 
     assert_includes text, "payload.path"
     assert_includes text, "payload.find"
@@ -60,7 +60,7 @@ class PromptTest < Minitest::Test
   end
 
   def test_a_profile_task_asks_for_the_profile_shape
-    text = AgentsFyi::Consultant::Prompt.build(task.merge("kind" => "profile"), mode: "profile")
+    text = Agents::Consultant::Prompt.build(task.merge("kind" => "profile"), mode: "profile")
 
     assert_includes text, '"fields"'
     refute_includes text, '"effects": [{"kind"'
@@ -77,7 +77,7 @@ class PromptTest < Minitest::Test
         "payload" => { "path" => "app/models/user.rb", "find" => "a", "replace" => "b" } }]
     }]
 
-    text = AgentsFyi::Consultant::Prompt.build_review(review_task,
+    text = Agents::Consultant::Prompt.build_review(review_task,
       question: review_task["question"],
       run: { "run" => { "verdict" => "failed", "from_version" => "7.0.0",
                         "to_version" => "7.1.0" }, "patch" => "--- a/app/models/user.rb\n" })
@@ -86,15 +86,15 @@ class PromptTest < Minitest::Test
     assert_includes text, "guard the link"
     assert_includes text, "app/models/user.rb"
     assert_includes text, "--- a/app/models/user.rb"
-    assert_includes text, "reviewer-prompt-1"
+    assert_includes text, "reviewer-prompt-2"
     assert_includes text, "Return the JSON object now."
   end
 
   def test_the_prompt_is_bounded
-    huge = "x" * (AgentsFyi::Consultant::Runner::MAX_PROMPT_BYTES + 1000)
-    runner = AgentsFyi::Consultant::Runner.new(binary: "true", agent: "consultant", scratch: "/tmp")
+    huge = "x" * (Agents::Consultant::Runner::MAX_PROMPT_BYTES + 1000)
+    runner = Agents::Consultant::Runner.new(binary: "true", agent: "consultant", scratch: "/tmp")
 
-    assert_equal AgentsFyi::Consultant::Runner::MAX_PROMPT_BYTES,
+    assert_equal Agents::Consultant::Runner::MAX_PROMPT_BYTES,
       runner.send(:clamp, huge).bytesize
   end
 end

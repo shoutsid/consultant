@@ -19,7 +19,7 @@ RUN if [ "$WITH_AGENT" = "1" ]; then npm install -g opencode-ai; fi
 RUN useradd --create-home --uid 10001 consultant
 WORKDIR /app
 COPY . /app
-RUN chmod 0755 /app/entrypoint.sh /app/bin/agents-fyi-consultant \
+RUN chmod 0755 /app/entrypoint.sh /app/bin/agents-consultant \
   && mkdir -p /home/consultant/state /home/consultant/records /home/consultant/scratch \
   && chown -R consultant:consultant /home/consultant /app
 

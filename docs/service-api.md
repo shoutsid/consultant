@@ -1,6 +1,6 @@
 # Service API
 
-The client uses one base URL (`AGENTS_FYI_URL`) and one credential (`AGENTS_FYI_KEY`, sent as
+The client uses one base URL (`AGENTS_URL`) and one credential (`AGENTS_KEY`, sent as
 `X-API-Key`). Every path below is the service's agent surface; the service's discovery document
 is the authority for the current shape.
 

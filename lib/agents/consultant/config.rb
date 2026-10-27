@@ -4,7 +4,7 @@ require "pathname"
 
 require_relative "errors"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **The deployment's knobs, read once.** The service URL and the agent key are required; every
     # other value has a conservative default. `CONSULTANT_MODEL` is the deployment's fallback chain;
@@ -16,8 +16,8 @@ module AgentsFyi
 
       def self.from_env(env = ENV)
         new(
-          base_url: env["AGENTS_FYI_URL"].to_s,
-          key: env["AGENTS_FYI_KEY"].to_s,
+          base_url: env["AGENTS_URL"].to_s,
+          key: env["AGENTS_KEY"].to_s,
           model: env["CONSULTANT_MODEL"].to_s,
           interval: env.fetch("CONSULTANT_INTERVAL", "300").to_i,
           claim_limit: env.fetch("CONSULTANT_CLAIM_LIMIT", "1").to_i,
@@ -54,8 +54,8 @@ module AgentsFyi
       end
 
       def validate!
-        raise ConfigError, "AGENTS_FYI_URL is required" if base_url.empty?
-        raise ConfigError, "AGENTS_FYI_KEY is required" if key.empty?
+        raise ConfigError, "AGENTS_URL is required" if base_url.empty?
+        raise ConfigError, "AGENTS_KEY is required" if key.empty?
         raise ConfigError, "CONSULTANT_OPENCODE is required" if opencode_binary.empty?
         raise ConfigError, "CONSULTANT_AGENT is required" if agent.empty?
         raise ConfigError, "CONSULTANT_REVIEW_AGENT is required" if review_agent.empty?

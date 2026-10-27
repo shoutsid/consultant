@@ -3,7 +3,7 @@
 require "json"
 require "digest"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **The model's output is data, and this is where it stops being trusted.**
     #

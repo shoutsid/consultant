@@ -5,7 +5,7 @@ require "fileutils"
 require "open3"
 require "tmpdir"
 
-require "agents_fyi/consultant"
+require "agents/consultant"
 
 class RepositoryTest < Minitest::Test
   def git(dir, *argv)
@@ -35,7 +35,7 @@ class RepositoryTest < Minitest::Test
   end
 
   def config(home)
-    AgentsFyi::Consultant::Config.new(
+    Agents::Consultant::Config.new(
       base_url: "http://service:8001", key: "afy_x", model: "test/model",
       interval: 0, claim_limit: 1, kinds: %w[scan], task_timeout: 60,
       opencode_binary: "true", agent: "consultant", home: home
@@ -50,7 +50,7 @@ class RepositoryTest < Minitest::Test
     Dir.mktmpdir do |root|
       source = repo(File.join(root, "source"))
       home = File.join(root, "home")
-      repository = AgentsFyi::Consultant::Repository.new(config: config(home),
+      repository = Agents::Consultant::Repository.new(config: config(home),
         task: task(source))
 
       snapshot, problem = repository.snapshot(mode: "scan",
@@ -66,7 +66,7 @@ class RepositoryTest < Minitest::Test
   def test_the_profile_read_takes_the_lockfile_and_not_the_test_tree
     Dir.mktmpdir do |root|
       source = repo(File.join(root, "source"))
-      repository = AgentsFyi::Consultant::Repository.new(config: config(File.join(root, "home")),
+      repository = Agents::Consultant::Repository.new(config: config(File.join(root, "home")),
         task: task(source))
 
       snapshot, problem = repository.snapshot(mode: "profile")
@@ -85,7 +85,7 @@ class RepositoryTest < Minitest::Test
         "API_KEY = \"afy_canary_12345678\"\n")
       git(source, "add", ".")
       git(source, "commit", "-q", "-m", "secret")
-      repository = AgentsFyi::Consultant::Repository.new(config: config(File.join(root, "home")),
+      repository = Agents::Consultant::Repository.new(config: config(File.join(root, "home")),
         task: task(source))
 
       snapshot, problem = repository.snapshot(mode: "scan", question: {})
@@ -98,7 +98,7 @@ class RepositoryTest < Minitest::Test
 
   def test_an_unreadable_repository_is_a_sentence_not_a_crash
     Dir.mktmpdir do |root|
-      repository = AgentsFyi::Consultant::Repository.new(config: config(File.join(root, "home")),
+      repository = Agents::Consultant::Repository.new(config: config(File.join(root, "home")),
         task: task(File.join(root, "does-not-exist")))
 
       snapshot, problem = repository.snapshot(mode: "profile")
@@ -111,7 +111,7 @@ class RepositoryTest < Minitest::Test
   def test_a_second_snapshot_sees_a_new_commit
     Dir.mktmpdir do |root|
       source = repo(File.join(root, "source"))
-      repository = AgentsFyi::Consultant::Repository.new(config: config(File.join(root, "home")),
+      repository = Agents::Consultant::Repository.new(config: config(File.join(root, "home")),
         task: task(source))
       repository.snapshot(mode: "scan", question: {})
 

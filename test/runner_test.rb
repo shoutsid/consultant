@@ -3,7 +3,7 @@
 require "minitest/autorun"
 require "tmpdir"
 
-require "agents_fyi/consultant"
+require "agents/consultant"
 
 class RunnerTest < Minitest::Test
   def test_a_large_prompt_is_attached_as_a_file_and_removed_after
@@ -18,7 +18,7 @@ class RunnerTest < Minitest::Test
         done
       SH
       File.chmod(0o755, binary)
-      runner = AgentsFyi::Consultant::Runner.new(binary: binary, agent: "consultant",
+      runner = Agents::Consultant::Runner.new(binary: binary, agent: "consultant",
         scratch: File.join(dir, "scratch"))
       prompt = "x" * 100_000
 
@@ -43,7 +43,7 @@ class RunnerTest < Minitest::Test
         echo '{"type":"text","sessionID":"ses_test","part":{"text":"{\\"ok\\":true}"}}'
       SH
       File.chmod(0o755, binary)
-      runner = AgentsFyi::Consultant::Runner.new(binary: binary, agent: "consultant",
+      runner = Agents::Consultant::Runner.new(binary: binary, agent: "consultant",
         scratch: File.join(dir, "scratch"))
 
       text, error, usage = runner.run("prompt", model: "provider/model")

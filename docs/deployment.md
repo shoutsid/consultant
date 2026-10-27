@@ -13,7 +13,7 @@ docker compose run --rm --no-deps service \
 ```
 
 Put the key in the deployment's environment as `CONSULTANT_KEY`; the compose file maps it to
-`AGENTS_FYI_KEY` inside the consultant container. The account the key belongs to must be
+`AGENTS_KEY` inside the consultant container. The account the key belongs to must be
 unpaused, and a project's policy must be on and consenting before the walk asks it anything.
 
 ## The model side

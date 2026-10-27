@@ -5,6 +5,13 @@ its image and its command line.
 
 ## [Unreleased]
 
+### Changed
+
+- The project is **Agents**. The client is `agents-consultant`, the namespace is
+  `Agents::Consultant`, the environment variables use the `AGENTS_` prefix, and the image tags use
+  `agents-consultant`. The old names are not read or accepted. The prompt changes with the rename,
+  so the proposer is `consultant-prompt-6` and the reviewer is `reviewer-prompt-2`.
+
 ### Added
 
 - The standalone client repository, extracted from the service's `lib/consultant` tree.

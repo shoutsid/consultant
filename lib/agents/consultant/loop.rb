@@ -10,7 +10,7 @@ require_relative "prompt"
 require_relative "validator"
 require_relative "repository"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **One task at a time, with a heartbeat and a record.** The loop asks the service what to do,
     # reads the question, gives the model a bounded prompt, validates the answer, posts it and

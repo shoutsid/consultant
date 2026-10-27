@@ -45,7 +45,7 @@ test, it likely belongs in the service's cross-repository contract suite, not he
 The image can be built without the model binary:
 
 ```bash
-docker build --build-arg WITH_AGENT=0 -t agentsfyi-consultant .
+docker build --build-arg WITH_AGENT=0 -t agents-consultant .
 ```
 
 ## Design rules

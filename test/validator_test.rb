@@ -2,7 +2,7 @@
 
 require "minitest/autorun"
 
-require "agents_fyi/consultant"
+require "agents/consultant"
 
 class ValidatorTest < Minitest::Test
   def answer(effects:, stance: "answer")
@@ -21,7 +21,7 @@ class ValidatorTest < Minitest::Test
   end
 
   def test_a_safe_patch_is_read
-    proposal, problem = AgentsFyi::Consultant::Validator.read(answer(effects: [patch("app/models/user.rb")]))
+    proposal, problem = Agents::Consultant::Validator.read(answer(effects: [patch("app/models/user.rb")]))
 
     assert_nil problem
     assert_equal "answer", proposal["stance"]
@@ -32,7 +32,7 @@ class ValidatorTest < Minitest::Test
   def test_a_test_or_credential_path_is_refused
     %w[test/models/user_test.rb spec/user_spec.rb .github/workflows/ci.yml .env Gemfile
       config/credentials.yml.enc bin/rails].each do |path|
-      proposal, problem = AgentsFyi::Consultant::Validator.read(answer(effects: [patch(path)]))
+      proposal, problem = Agents::Consultant::Validator.read(answer(effects: [patch(path)]))
 
       assert_nil proposal, path
       assert_match(/may not propose/, problem, path)
@@ -42,7 +42,7 @@ class ValidatorTest < Minitest::Test
   def test_a_whole_file_effect_is_refused_for_a_model
     effect = { "kind" => "file", "payload" => { "path" => "app/models/user.rb", "content" => "x" } }
 
-    proposal, problem = AgentsFyi::Consultant::Validator.read(answer(effects: [effect]))
+    proposal, problem = Agents::Consultant::Validator.read(answer(effects: [effect]))
 
     assert_nil proposal
     assert_match(/whole-file/, problem)
@@ -51,21 +51,21 @@ class ValidatorTest < Minitest::Test
   def test_a_secret_in_an_effect_is_refused
     effect = patch("app/models/user.rb", params: { "replace" => "API_KEY = \"afy_canary_12345678\"" })
 
-    proposal, problem = AgentsFyi::Consultant::Validator.read(answer(effects: [effect]))
+    proposal, problem = Agents::Consultant::Validator.read(answer(effects: [effect]))
 
     assert_nil proposal
     assert_match(/secret/, problem)
   end
 
   def test_maybe_and_cannot_carry_no_effects
-    proposal, problem = AgentsFyi::Consultant::Validator.read(
+    proposal, problem = Agents::Consultant::Validator.read(
       answer(effects: [patch("app/models/user.rb")], stance: "cannot")
     )
 
     assert_nil problem
     assert_equal [], proposal["effects"]
 
-    proposal, problem = AgentsFyi::Consultant::Validator.read(
+    proposal, problem = Agents::Consultant::Validator.read(
       answer(effects: [], stance: "answer")
     )
     assert_nil proposal
@@ -73,7 +73,7 @@ class ValidatorTest < Minitest::Test
   end
 
   def test_a_model_output_with_no_json_is_a_refusal_not_a_crash
-    proposal, problem = AgentsFyi::Consultant::Validator.read("I think you should guard it.")
+    proposal, problem = Agents::Consultant::Validator.read("I think you should guard it.")
 
     assert_nil proposal
     assert_match(/JSON/, problem)
@@ -92,7 +92,7 @@ class ValidatorTest < Minitest::Test
       ],
       "provenance" => { "model" => "test/model" }
     )
-    proposal, problem = AgentsFyi::Consultant::Validator.read_scan(text)
+    proposal, problem = Agents::Consultant::Validator.read_scan(text)
 
     assert_nil problem
     assert_equal %w[missed not_present], proposal["annotations"].map { |row| row["kind"] }
@@ -103,7 +103,7 @@ class ValidatorTest < Minitest::Test
                           "effects" => [patch("spec/user_spec.rb")] }],
       "provenance" => { "model" => "test/model" }
     )
-    proposal, problem = AgentsFyi::Consultant::Validator.read_scan(unsafe)
+    proposal, problem = Agents::Consultant::Validator.read_scan(unsafe)
     assert_nil proposal
     assert_match(/may not propose/, problem)
   end
@@ -114,7 +114,7 @@ class ValidatorTest < Minitest::Test
       "effects" => [patch("app/views/layouts/application.html.erb")],
       "needs" => [], "provenance" => { "model" => "test/model" }
     )
-    proposal, problem = AgentsFyi::Consultant::Validator.read(text, mode: "repair")
+    proposal, problem = Agents::Consultant::Validator.read(text, mode: "repair")
 
     assert_nil problem
     assert_equal "post", proposal["effects"].first["phase"]
@@ -123,13 +123,13 @@ class ValidatorTest < Minitest::Test
   def test_a_profile_refuses_an_unknown_field_and_a_secret
     text = JSON.generate("fields" => { "checks" => { "value" => [] } },
       "provenance" => { "model" => "test/model" })
-    proposal, problem = AgentsFyi::Consultant::Validator.read_profile(text)
+    proposal, problem = Agents::Consultant::Validator.read_profile(text)
     assert_nil problem
     assert proposal.dig("fields", "checks")
 
     text = JSON.generate("fields" => { "invented" => { "value" => true } },
       "provenance" => { "model" => "test/model" })
-    proposal, problem = AgentsFyi::Consultant::Validator.read_profile(text)
+    proposal, problem = Agents::Consultant::Validator.read_profile(text)
     assert_nil proposal
     assert_match(/not one the consultant may propose/, problem)
   end
@@ -143,25 +143,25 @@ class ValidatorTest < Minitest::Test
                                    "path" => "app/models/user.rb", "line" => 3 }],
       "rationale" => "the effect is the failure",
       "provenance" => { "model" => "test/model", "agent" => agent,
-                        "prompt_version" => "reviewer-prompt-1",
+                        "prompt_version" => "reviewer-prompt-2",
                         "files_read" => ["app/models/user.rb"] }
     )
   end
 
   def test_a_safe_review_needs_evidence_and_a_reviewer_agent
-    proposal, problem = AgentsFyi::Consultant::Validator.read_review(review_text)
+    proposal, problem = Agents::Consultant::Validator.read_review(review_text)
 
     assert_nil problem
     assert_equal "safe", proposal["verdict"]
     assert_equal "reviewer", proposal.dig("provenance", "agent")
 
-    proposal, problem = AgentsFyi::Consultant::Validator.read_review(
+    proposal, problem = Agents::Consultant::Validator.read_review(
       review_text(evidence: [])
     )
     assert_nil proposal
     assert_match(/evidence/, problem)
 
-    proposal, problem = AgentsFyi::Consultant::Validator.read_review(
+    proposal, problem = Agents::Consultant::Validator.read_review(
       review_text(agent: "consultant")
     )
     assert_nil proposal
@@ -169,7 +169,7 @@ class ValidatorTest < Minitest::Test
   end
 
   def test_an_unsafe_review_keeps_its_concerns
-    proposal, problem = AgentsFyi::Consultant::Validator.read_review(
+    proposal, problem = Agents::Consultant::Validator.read_review(
       review_text(verdict: "unsafe")
     )
 

@@ -57,7 +57,7 @@ jobs:
           context: .
           file: ./Dockerfile
           load: true
-          tags: agentsfyi-consultant:ci
+          tags: agents-consultant:ci
           build-args: |
             WITH_AGENT=0
           cache-from: type=gha,scope=consultant
@@ -65,8 +65,8 @@ jobs:
 
       - name: The image runs as a non-root user
         run: |
-          user="$(docker run --rm --entrypoint id agentsfyi-consultant:ci -un)"
+          user="$(docker run --rm --entrypoint id agents-consultant:ci -un)"
           [ "$user" = "consultant" ] || { echo "expected consultant, got $user"; exit 1; }
 
       - name: The command answers --help
-        run: docker run --rm --entrypoint /app/bin/agents-fyi-consultant agentsfyi-consultant:ci --help
+        run: docker run --rm --entrypoint /app/bin/agents-consultant agents-consultant:ci --help

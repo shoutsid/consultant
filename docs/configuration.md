@@ -7,8 +7,8 @@ file.
 
 | Variable | Meaning |
 |---|---|
-| `AGENTS_FYI_URL` | The service base URL. On a compose network this is the service name, not the public hostname. |
-| `AGENTS_FYI_KEY` | An agent key. It is not an admin token and cannot accept, dismiss, promote, run, file or verify. |
+| `AGENTS_URL` | The service base URL. On a compose network this is the service name, not the public hostname. |
+| `AGENTS_KEY` | An agent key. It is not an admin token and cannot accept, dismiss, promote, run, file or verify. |
 | `CONSULTANT_MODEL` | The deployment's fallback model chain. A project's policy may name a narrower one. |
 
 ## The loop
@@ -28,7 +28,7 @@ file.
 ## Command line
 
 ```text
-agents-fyi-consultant [--once|--cycles N] [--tasks N]
+agents-consultant [--once|--cycles N] [--tasks N]
 ```
 
 - `--once` — one poll, then exit. This is the probe and the CI check.

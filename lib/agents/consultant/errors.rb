@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module AgentsFyi
+module Agents
   module Consultant
     # **A refused request, with whether trying again could help.** The same distinction the miner
     # learned: a 4xx is the service reading this request and declining it, while a 5xx or a timeout

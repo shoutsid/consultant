@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## `AGENTS_FYI_URL is required` / `AGENTS_FYI_KEY is required`
+## `AGENTS_URL is required` / `AGENTS_KEY is required`
 
 The client refused at start-up. Set both in the container's environment. On a compose network
 the URL is the service name (`http://service:8001`), not the public hostname.
@@ -8,7 +8,7 @@ the URL is the service name (`http://service:8001`), not the public hostname.
 ## `401` or `403` on the first control read
 
 The key is missing, disabled or not an agent key. Register the operator in the service and put
-the *agent* key in `AGENTS_FYI_KEY`. An admin token is not an agent key.
+the *agent* key in `AGENTS_KEY`. An admin token is not an agent key.
 
 ## `the opencode binary is required`
 
@@ -45,7 +45,7 @@ command line, that is the wrapper's bug; the bundled runner does not.
 ## The container cannot reach the service
 
 The service URL on the compose network is `http://service:8001`; the public hostname goes
-through the tunnel and is not what the client uses. Check `AGENTS_FYI_URL`, not the browser URL.
+through the tunnel and is not what the client uses. Check `AGENTS_URL`, not the browser URL.
 
 ## A record is missing
 

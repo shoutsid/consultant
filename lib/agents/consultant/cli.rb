@@ -4,7 +4,7 @@ require "optparse"
 
 require_relative "../consultant"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **A bounded run, or a loop a deployment starts.** `--once` is the probe and the CI check:
     # one control read and one claim, so a deployment with a broken key says so instead of retrying
@@ -13,7 +13,7 @@ module AgentsFyi
       def self.run(argv, env: ENV, out: $stdout, err: $stderr)
         options = { cycles: 1, tasks: nil }
         parser = OptionParser.new do |opts|
-          opts.banner = "Usage: agents-fyi-consultant [--once|--cycles N] [--tasks N]"
+          opts.banner = "Usage: agents-consultant [--once|--cycles N] [--tasks N]"
           opts.on("--once", "One poll, then exit") { options[:cycles] = 1 }
           opts.on("--cycles N", Integer, "Poll N times") { |value| options[:cycles] = value }
           opts.on("--tasks N", Integer, "Stop after N tasks") { |value| options[:tasks] = value }

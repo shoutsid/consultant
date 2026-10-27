@@ -6,7 +6,7 @@ require "uri"
 
 require_relative "errors"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **The service, over the task API and nothing else.** The consultant is a client with an agent
     # key: it has no database driver, no admin token and no route to the walker's files. Every method
@@ -19,8 +19,8 @@ module AgentsFyi
       attr_reader :base_url
 
       def initialize(base_url:, key:, http: nil, open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT)
-        raise ConfigError, "AGENTS_FYI_URL is required" if base_url.to_s.empty?
-        raise ConfigError, "AGENTS_FYI_KEY is required" if key.to_s.empty?
+        raise ConfigError, "AGENTS_URL is required" if base_url.to_s.empty?
+        raise ConfigError, "AGENTS_KEY is required" if key.to_s.empty?
 
         @base_url = base_url.to_s.delete_suffix('/')
         @key = key.to_s

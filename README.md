@@ -1,4 +1,4 @@
-# agents-fyi consultant
+# Agents consultant
 
 A client of the service that reads a decision an upgrade walk could not make and proposes what to do
 about it. It is **not** a second walker: the deterministic walk is the only thing that applies an
@@ -48,7 +48,7 @@ ruby -Ilib -Itest test/all_test.rb
 The image can be built without the model binary:
 
 ```sh
-docker build --build-arg WITH_AGENT=0 -t agentsfyi-consultant .
+docker build --build-arg WITH_AGENT=0 -t agents-consultant .
 ```
 
 ## The loop

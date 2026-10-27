@@ -37,10 +37,10 @@ change needs both sides to test, add it to the service's contract suite.
 
 ```bash
 # The production shape: the model binary is installed.
-docker build -t agentsfyi-consultant .
+docker build -t agents-consultant .
 
 # CI and offline: the client starts and refuses with a sentence rather than a missing binary.
-docker build --build-arg WITH_AGENT=0 -t agentsfyi-consultant:ci .
+docker build --build-arg WITH_AGENT=0 -t agents-consultant:ci .
 ```
 
 The image runs as uid `10001`, copies the agent files from `/app/agent`, and writes them to the

@@ -1,7 +1,7 @@
 # Consultant documentation
 
 The consultant is the client that reads a decision an upgrade walk could not make and proposes
-what to do about it. It is a caller of the **agents-fyi** service, with its own repository,
+what to do about it. It is a caller of the **agents** service, with its own repository,
 runtime and image.
 
 Start with the [README](../README.md). These pages go deeper:

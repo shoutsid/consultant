@@ -8,7 +8,7 @@ require "timeout"
 
 require_relative "errors"
 
-module AgentsFyi
+module Agents
   module Consultant
     # **The model process, with no walker environment and no shell.**
     #

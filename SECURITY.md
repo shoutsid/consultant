@@ -31,7 +31,7 @@ a service. The boundary is the container and the validator, not the model provid
 
 In scope:
 
-- **The agent key.** A path that reads, logs or transmits `AGENTS_FYI_KEY`, or that lets a
+- **The agent key.** A path that reads, logs or transmits `AGENTS_KEY`, or that lets a
   model-authored effect reach the service's admin surface, is a vulnerability.
 - **The model credential.** The provider credential lives in the mounted home, not in an image
   layer. A path that writes it into a record, a log, a proposal or an image is in scope.

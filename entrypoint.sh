@@ -14,4 +14,4 @@ for agent in consultant reviewer; do
   fi
 done
 
-exec /app/bin/agents-fyi-consultant "$@"
+exec /app/bin/agents-consultant "$@"
