@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3.12"
+
+      - name: Check Ruby syntax
+        run: |
+          find . -name '*.rb' -not -path './.git/*' -print0 |
+            while IFS= read -r -d '' file; do
+              ruby -c "$file" > /dev/null || exit 1
+            done
+
+      - name: Check shell syntax
+        run: |
+          find . -name '*.sh' -not -path './.git/*' -print0 |
+            while IFS= read -r -d '' file; do
+              bash -n "$file" || exit 1
+            done
+
+      - name: Run the suite
+        run: ruby -Ilib -Itest test/all_test.rb
+
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: test
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the image without the model binary
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: agentsfyi-consultant:ci
+          build-args: |
+            WITH_AGENT=0
+          cache-from: type=gha,scope=consultant
+          cache-to: type=gha,mode=max,scope=consultant
+
+      - name: The image runs as a non-root user
+        run: |
+          user="$(docker run --rm --entrypoint id agentsfyi-consultant:ci -un)"
+          [ "$user" = "consultant" ] || { echo "expected consultant, got $user"; exit 1; }
+
+      - name: The command answers --help
+        run: docker run --rm --entrypoint /app/bin/agents-fyi-consultant agentsfyi-consultant:ci --help

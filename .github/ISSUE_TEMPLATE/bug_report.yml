@@ -1,0 +1,94 @@
+name: Bug report
+description: Report a reproducible problem with the consultant.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please search the existing issues and
+        read [Troubleshooting](https://github.com/shoutsid/consultant/blob/main/docs/troubleshooting.md)
+        first.
+
+        **Do not paste an agent key, a provider credential, a private repository name or private
+        source.** Redact the log before attaching it. Security reports go through
+        [SECURITY.md](https://github.com/shoutsid/consultant/blob/main/SECURITY.md), not this form.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag, the commit, or the output of the command that failed.
+      placeholder: "v0.1.0 or 1a2b3c4"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and Ruby
+      description: For example "Ubuntu 24.04, Ruby 3.3.12".
+      placeholder: "Ubuntu 24.04, Ruby 3.3.12"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Task kind
+      options:
+        - answer
+        - review
+        - profile
+        - scan
+        - intent
+        - repair
+        - the container would not start
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or invocation
+      description: The exact command and flags, with the service URL but no key.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should have happened, and why.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The exit code, the control line, the task id and the relevant log lines. Redact secrets.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The smallest task, public repository or prompt that shows the problem.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues.
+          required: true
+        - label: I read the troubleshooting guide.
+          required: true
+        - label: I removed keys, credentials and private source from this report.
+          required: true

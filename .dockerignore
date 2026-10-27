@@ -1,0 +1,15 @@
+# The client's own build context.
+#
+# The image needs the entrypoint, the binary, the agent files and the library; the suite, the
+# repository metadata and a local `.env` are not runtime inputs.
+.git
+.github
+test
+docs
+.env
+.env.*
+*.log
+.DS_Store
+.idea
+.vscode
+.direnv
