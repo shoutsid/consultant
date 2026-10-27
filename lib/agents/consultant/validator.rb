@@ -304,7 +304,10 @@ module Agents
           total = 0
           PRESENT_NARRATIVE_KEYS.each do |key|
             label = key.tr("_", " ")
-            text = raw[key].to_s.gsub(/\r\n?/, "\n").strip
+            value = raw[key]
+            return [nil, "the #{label} narrative must be text"] unless value.is_a?(String)
+
+            text = value.gsub(/\r\n?/, "\n").strip
             if text.length < PRESENT_MIN_NARRATIVE || text.length > PRESENT_MAX_NARRATIVE
               return [nil, "the #{label} narrative must be #{PRESENT_MIN_NARRATIVE} to " \
                            "#{PRESENT_MAX_NARRATIVE} characters"]
