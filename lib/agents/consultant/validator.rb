@@ -240,7 +240,7 @@ module Agents
           if summary.length < PRESENT_MIN_SUMMARY || summary.length > PRESENT_MAX_SUMMARY
             return [nil, "the summary must be #{PRESENT_MIN_SUMMARY} to #{PRESENT_MAX_SUMMARY} characters"]
           end
-          return [nil, "the summary carries raw HTML"] if summary.match?(/[<>]/)
+          return [nil, "the summary carries raw HTML"] if summary.match?(/<\/?[A-Za-z][^>]*>/)
           return [nil, "the summary carries a heading"] if summary.match?(/^\s*#/m)
           return [nil, "the summary carries a code fence"] if summary.include?("```")
           return [nil, "the summary carries a Markdown link"] if summary.include?("](")
@@ -262,7 +262,7 @@ module Agents
               return [nil, "review_focus #{index + 1} needs a reason of #{PRESENT_MIN_WHY} to " \
                            "#{PRESENT_MAX_WHY} characters"]
             end
-            return [nil, "review_focus #{index + 1} carries raw HTML"] if why.match?(/[<>]/)
+            return [nil, "review_focus #{index + 1} carries raw HTML"] if why.match?(/<\/?[A-Za-z][^>]*>/)
             return [nil, "review_focus #{index + 1} carries a code fence"] if why.include?("```")
             return [nil, "review_focus #{index + 1} carries a Markdown link"] if why.include?("](")
             return [nil, "review_focus #{index + 1} carries a secret-looking value"] if secret?(why)

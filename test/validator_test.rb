@@ -210,6 +210,15 @@ class ValidatorTest < Minitest::Test
     assert_match(/characters/, problem)
   end
 
+  def test_a_presentation_allows_an_arrow_as_prose
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(summary: "The suite passed for 4.0.0.rc1 -> 4.0.13 and the change is small.")
+    )
+
+    assert_nil problem
+    assert_includes proposal["summary"], "->"
+  end
+
   def test_a_presentation_refuses_a_merge_claim_and_a_secret
     proposal, problem = Agents::Consultant::Validator.read_presentation(
       presentation_text(summary: "The suite passed and the change is safe to merge.")
