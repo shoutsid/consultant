@@ -215,6 +215,20 @@ class ValidatorTest < Minitest::Test
     assert_match(/what changed/, problem)
   end
 
+  def test_a_presentation_allows_a_narrative_that_starts_with_a_version
+    text = presentation_text(narrative: {
+      "what_moved" => "7.1.0 is the release this rung lands on, and the suite was green before " \
+        "and after the step. The only application change is the serialize call in User.",
+      "what_changed" => "The User model's serialize call changes and nothing else in the " \
+        "application does; the dependency set moves with the rung."
+    })
+
+    proposal, problem = Agents::Consultant::Validator.read_presentation(text)
+
+    assert_nil problem
+    assert_includes proposal.dig("narrative", "what_moved"), "7.1.0 is the release"
+  end
+
   def test_a_presentation_refuses_a_narrative_that_is_a_list
     proposal, problem = Agents::Consultant::Validator.read_presentation(
       presentation_text(narrative: {
