@@ -77,6 +77,12 @@ module Agents
         get("/api/upgrades/runs/#{escape(id)}")
       end
 
+      # The presenter's input: the deterministic body, the fact sheet and the project's review
+      # guide. A `present` task names the run; the service holds the rest.
+      def presentation(run_id)
+        get("/api/upgrades/runs/#{escape(run_id)}/presentation")
+      end
+
       def resolution(project_id, from_version: nil, to_version: nil)
         params = {}
         params["from"] = from_version unless from_version.to_s.empty?

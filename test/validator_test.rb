@@ -177,4 +177,49 @@ class ValidatorTest < Minitest::Test
     assert_equal "widened_change", proposal["concerns"].first["kind"]
     assert_equal "app/models/user.rb", proposal["concerns"].first["path"]
   end
+
+  def presentation_text(summary: "The suite passed and the only application edit is the serialize call.",
+    anchor: "path:app/models/user.rb",
+    why: "the serialize call is the one behavioural change in this rung.")
+    JSON.generate(
+      "summary" => summary,
+      "review_focus" => [{ "anchor" => anchor, "why" => why }],
+      "provenance" => { "model" => "test/model", "prompt_version" => "presenter-prompt-1" }
+    )
+  end
+
+  def test_a_presentation_is_read_as_typed_fields
+    proposal, problem = Agents::Consultant::Validator.read_presentation(presentation_text)
+
+    assert_nil problem
+    assert_equal "path:app/models/user.rb", proposal["review_focus"].first["anchor"]
+    assert_equal "consultant/1", proposal.dig("provenance", "harness")
+  end
+
+  def test_a_presentation_refuses_an_untyped_anchor_and_a_short_summary
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(anchor: "app/models/user.rb")
+    )
+    assert_nil proposal
+    assert_match(/typed anchor/, problem)
+
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(summary: "Too short.")
+    )
+    assert_nil proposal
+    assert_match(/characters/, problem)
+  end
+
+  def test_a_presentation_refuses_a_merge_claim_and_a_secret
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(summary: "The suite passed and the change is safe to merge.")
+    )
+    assert_nil problem, "the client gate does not judge the claim; the service does"
+
+    proposal, problem = Agents::Consultant::Validator.read_presentation(
+      presentation_text(why: "the token is API_KEY=abcdef0123456789abcdef and that is the risk.")
+    )
+    assert_nil proposal
+    assert_match(/secret/, problem)
+  end
 end

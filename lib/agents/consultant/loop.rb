@@ -72,7 +72,11 @@ module Agents
         question = task["question"].is_a?(Hash) ? task["question"] : {}
         mode = task["kind"].to_s
         heartbeat(task_id, lease)
-        repository, repository_problem = repository_for(task, mode, question)
+        repository, repository_problem = if mode == "present"
+          [nil, nil]
+        else
+          repository_for(task, mode, question)
+        end
         if repository_problem && %w[profile scan repair].include?(mode)
           # A repository this container cannot read is a fact about access, not a model failure:
           # a person decides whether to grant it or fill the profile by hand.
@@ -81,7 +85,10 @@ module Agents
           return nil
         end
         run_detail = run_for(task, question)
-        prompt = if mode == "review"
+        presentation = mode == "present" ? presentation_for(task) : nil
+        prompt = if mode == "present"
+          Prompt.build_present(task, presentation: presentation, run: run_detail)
+        elsif mode == "review"
           Prompt.build_review(task, question: question, run: run_detail,
             repository: repository.is_a?(Hash) ? repository : nil)
         else
@@ -92,6 +99,8 @@ module Agents
         started = @clock.now
         text, error, usage = if mode == "review"
           @runner.run(prompt, model: model, mode: mode, agent: @config.review_agent)
+        elsif mode == "present"
+          @runner.run(prompt, model: model, mode: mode, agent: @config.present_agent)
         else
           @runner.run(prompt, model: model, mode: mode)
         end
@@ -109,6 +118,7 @@ module Agents
         when "profile" then Validator.read_profile(text)
         when "scan" then Validator.read_scan(text)
         when "review" then Validator.read_review(text)
+        when "present" then Validator.read_presentation(text)
         else Validator.read(text, mode: mode)
         end
         if problem
@@ -124,6 +134,7 @@ module Agents
         when "scan" then post_scan(proposal)
         when "review" then post_review(task, question, proposal, model: model,
           seconds: seconds, tokens_in: tokens_in, tokens_out: tokens_out)
+        when "present" then post_presentation(proposal, model: model)
         else post_answer(task, question, proposal, model: model)
         end
         if posted.is_a?(String)
@@ -167,6 +178,16 @@ module Agents
       rescue Error => e
         log("run #{id} could not be read: #{e.message}")
         nil
+      end
+
+      # The presentation is the service's own read of the deterministic body, the fact sheet and
+      # the project's guide. A task that names no run cannot be presented; a service refusal is the
+      # task's failure, not a prompt to invent the input.
+      def presentation_for(task)
+        run_id = task["run_id"].to_s
+        raise Error.new("the presentation task names no run") if run_id.empty?
+
+        @client.presentation(run_id)
       end
 
       # The mirror is cache, not evidence: a clone failure is reported as `:unreadable` and the
@@ -275,6 +296,17 @@ module Agents
         raise e if e.retryable?
 
         e.message
+      end
+
+      # **A presentation is the result, not an effect.** The service validates every anchor against
+      # the run's fact sheet and renders the Markdown; the loop posts the model's fields through the
+      # ordinary completion, so the task's spend and provenance are recorded like every other task.
+      def post_presentation(proposal, model:)
+        {
+          "summary" => proposal["summary"].to_s,
+          "review_focus" => Array(proposal["review_focus"]),
+          "provenance" => proposal["provenance"].merge("model" => model.to_s)
+        }
       end
 
       # **A scan annotation is the result, not an effect.** It is stored on the task so a person

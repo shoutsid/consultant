@@ -28,6 +28,12 @@ module Agents
         insufficient_evidence].freeze
       REVIEW_EVIDENCE_KINDS = %w[file output run profile].freeze
       REVIEW_ITEMS = 20
+      PRESENT_ANCHOR = /\A(path|commit|decision|check|report|change):\S.*\z/
+      PRESENT_MIN_SUMMARY = 40
+      PRESENT_MAX_SUMMARY = 1_200
+      PRESENT_MAX_FOCUS = 5
+      PRESENT_MIN_WHY = 20
+      PRESENT_MAX_WHY = 300
 
       class Refusal < StandardError; end
 
@@ -218,6 +224,60 @@ module Agents
             "concerns" => concerns,
             "evidence" => evidence,
             "rationale" => parsed["rationale"].to_s[0, 8 * 1024],
+            "provenance" => provenance.merge("harness" => "consultant/1")
+          }, nil]
+        rescue Refusal => e
+          [nil, e.message]
+        end
+
+        # **A presentation is prose with typed anchors, not a second review.** The service checks
+        # that each anchor exists in the run's fact sheet; this gate keeps the shape, the length and
+        # the secrets out of the request at all. The model is allowed to say `cannot` only by not
+        # answering; a presentation task has one useful result, the lead.
+        def read_presentation(text)
+          parsed = parse(text)
+          summary = parsed["summary"].to_s.strip
+          if summary.length < PRESENT_MIN_SUMMARY || summary.length > PRESENT_MAX_SUMMARY
+            return [nil, "the summary must be #{PRESENT_MIN_SUMMARY} to #{PRESENT_MAX_SUMMARY} characters"]
+          end
+          return [nil, "the summary carries raw HTML"] if summary.match?(/[<>]/)
+          return [nil, "the summary carries a heading"] if summary.match?(/^\s*#/m)
+          return [nil, "the summary carries a code fence"] if summary.include?("```")
+          return [nil, "the summary carries a Markdown link"] if summary.include?("](")
+          return [nil, "the summary carries a secret-looking value"] if secret?(summary)
+
+          focus = Array(parsed["review_focus"]).grep(Hash)
+          if focus.empty? || focus.length > PRESENT_MAX_FOCUS
+            return [nil, "review_focus must carry 1 to #{PRESENT_MAX_FOCUS} items"]
+          end
+
+          cleaned = focus.each_with_index.map do |item, index|
+            anchor = item["anchor"].to_s.strip
+            why = item["why"].to_s.strip
+            unless PRESENT_ANCHOR.match?(anchor)
+              return [nil, "review_focus #{index + 1} needs a typed anchor " \
+                           "(path:, commit:, decision:, check:, report: or change:)"]
+            end
+            if why.length < PRESENT_MIN_WHY || why.length > PRESENT_MAX_WHY
+              return [nil, "review_focus #{index + 1} needs a reason of #{PRESENT_MIN_WHY} to " \
+                           "#{PRESENT_MAX_WHY} characters"]
+            end
+            return [nil, "review_focus #{index + 1} carries raw HTML"] if why.match?(/[<>]/)
+            return [nil, "review_focus #{index + 1} carries a code fence"] if why.include?("```")
+            return [nil, "review_focus #{index + 1} carries a Markdown link"] if why.include?("](")
+            return [nil, "review_focus #{index + 1} carries a secret-looking value"] if secret?(why)
+
+            { "anchor" => anchor, "why" => why }
+          end
+
+          provenance = parsed["provenance"].is_a?(Hash) ? parsed["provenance"] : {}
+          if provenance["model"].to_s.strip.empty? || provenance["prompt_version"].to_s.strip.empty?
+            return [nil, "a presentation needs provenance (model, prompt_version)"]
+          end
+
+          [{
+            "summary" => summary,
+            "review_focus" => cleaned,
             "provenance" => provenance.merge("harness" => "consultant/1")
           }, nil]
         rescue Refusal => e

@@ -29,16 +29,34 @@ class LoopTest < Minitest::Test
     end
 
     def run(id) = (@calls << [:run, id]) && { "patch" => "diff" }
+
+    def presentation(run_id)
+      (@calls << [:presentation, run_id]) && {
+        "state" => "requested",
+        "input" => {
+          "presentation" => { "body" => "## What moved\n\nThe suite passed." },
+          "fact_sheet" => { "run" => { "verdict" => "passed", "from_version" => "7.0.0",
+                                       "to_version" => "7.1.0" },
+                            "changed_paths" => ["app/models/user.rb"] },
+          "guide" => { "rules" => ["A project rule"], "template" => "## Description",
+                       "examples" => [] }
+        }
+      }
+    end
   end
 
   class FakeRunner
+    attr_reader :calls
+
     def initialize(text: nil, error: nil, usage: nil)
       @text = text
       @error = error
       @usage = usage
+      @calls = []
     end
 
     def run(prompt, model: nil, mode: nil, agent: nil)
+      @calls << { model: model, mode: mode, agent: agent }
       return [nil, @error, nil] if @error
 
       [@text, nil, @usage]
@@ -90,6 +108,29 @@ class LoopTest < Minitest::Test
       assert File.exist?(File.join(dir, "records", "task-1.json"))
       refute_includes File.read(File.join(dir, "records", "task-1.json")), "What should happen?",
         "the record stores a prompt hash, not the prompt"
+    end
+  end
+
+  def test_a_present_task_reads_the_presentation_and_completes_with_the_lead
+    Dir.mktmpdir do |dir|
+      client = FakeClient.new
+      runner = FakeRunner.new(text: JSON.generate(
+        "summary" => "The suite passed and the only application edit is the serialize call in User.",
+        "review_focus" => [{ "anchor" => "path:app/models/user.rb",
+                             "why" => "the serialize call is the one behavioural change in this rung." }],
+        "provenance" => { "model" => "provider/model",
+                          "prompt_version" => "presenter-prompt-1" }
+      ))
+      subject = loop(client: client, runner: runner, dir: dir)
+
+      result = subject.process(task(kind: "present", question: false).merge("run_id" => "run-1"))
+
+      assert_includes result, "serialize call"
+      assert client.calls.any? { |call| call.first == :presentation && call[1] == "run-1" }
+      complete = client.calls.find { |call| call.first == :complete }
+      assert_equal "path", complete[2][:result]["review_focus"].first["anchor"].split(":").first
+      assert_equal "presenter", runner.calls.first[:agent]
+      refute client.calls.any? { |call| call.first == :answer }
     end
   end
 

@@ -8,7 +8,7 @@ set -eu
 # agent is written on first boot because the volume hides an image path at /home/consultant; the
 # file is copied, never overwritten, so an operator can pin a different one deliberately.
 mkdir -p "$HOME/.config/opencode/agents"
-for agent in consultant reviewer; do
+for agent in consultant reviewer presenter; do
   if [ ! -f "$HOME/.config/opencode/agents/$agent.md" ]; then
     cp "/app/agent/$agent.md" "$HOME/.config/opencode/agents/$agent.md"
   fi

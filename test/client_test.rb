@@ -76,6 +76,18 @@ class ClientTest < Minitest::Test
     assert_equal "/api/upgrades/runs/r1", http.requests.first.first.path
   end
 
+  def test_a_presentation_is_read_for_its_run
+    http = FakeHttp.new(response(Net::HTTPOK, JSON.generate("state" => "drafted",
+      "editorial" => "## Summary", "input" => { "fact_sheet" => {} })))
+    subject = Agents::Consultant::Client.new(base_url: "http://service:8001",
+      key: "afy_agent_x", http: http)
+
+    body = subject.presentation("r1")
+
+    assert_equal "drafted", body["state"]
+    assert_equal "/api/upgrades/runs/r1/presentation", http.requests.first.first.path
+  end
+
   def test_a_query_is_encoded_and_a_missing_key_is_a_config_error
     assert_raises(Agents::Consultant::ConfigError) do
       Agents::Consultant::Client.new(base_url: "http://service:8001", key: "")

@@ -90,6 +90,31 @@ class PromptTest < Minitest::Test
     assert_includes text, "Return the JSON object now."
   end
 
+  def test_a_presenter_prompt_carries_the_guide_the_body_and_the_fact_sheet
+    text = Agents::Consultant::Prompt.build_present(
+      task.merge("kind" => "present", "run_id" => "run-1"),
+      presentation: {
+        "input" => {
+          "presentation" => { "body" => "## What moved\n\nThe suite passed." },
+          "fact_sheet" => { "run" => { "verdict" => "passed", "from_version" => "7.0.0",
+                                       "to_version" => "7.1.0" },
+                            "changed_paths" => ["app/models/user.rb"] },
+          "guide" => { "language" => "English", "rules" => ["A project rule"],
+                       "template" => "## Description", "examples" => [] }
+        }
+      },
+      run: { "patch" => "--- a/app/models/user.rb\n" }
+    )
+
+    assert_includes text, "You are the agents presenter"
+    assert_includes text, "A project rule"
+    assert_includes text, "UNTRUSTED current body"
+    assert_includes text, "UNTRUSTED fact sheet"
+    assert_includes text, "UNTRUSTED run patch"
+    assert_includes text, "presenter-prompt-1"
+    assert_includes text, "Return the JSON object now."
+  end
+
   def test_the_prompt_is_bounded
     huge = "x" * (Agents::Consultant::Runner::MAX_PROMPT_BYTES + 1000)
     runner = Agents::Consultant::Runner.new(binary: "true", agent: "consultant", scratch: "/tmp")

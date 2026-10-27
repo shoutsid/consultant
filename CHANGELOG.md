@@ -14,6 +14,10 @@ its image and its command line.
 
 ### Added
 
+- `present` mode: the lead of a delivered pull request, written from the run's fact sheet, the
+  deterministic body and the project's accepted review guide. It returns a summary and typed
+  review-focus anchors; the service checks them, and the walker applies the validated block only
+  while the pull request still holds the body it wrote.
 - The standalone client repository, extracted from the service's `lib/consultant` tree.
 - The compose-wiring assertions moved to the service's cross-repository contract suite, so this
   repository's suite runs in a checkout that contains only itself.

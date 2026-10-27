@@ -22,6 +22,7 @@ is the authority for the current shape.
 |---|---|---|
 | `GET` | `/api/upgrades/decisions/:id` | The question, evidence and options. |
 | `GET` | `/api/upgrades/runs/:id` | The failed run a repair task is about. |
+| `GET` | `/api/upgrades/runs/:id/presentation` | A presentation task's deterministic body, fact sheet and project review guide. |
 | `GET` | `/api/upgrades/projects/:id/resolution` | The answer or rule in force for a project's move. |
 | `POST` | `/api/upgrades/decisions/:id/answers` | Propose an answer with a stance, typed effects and provenance. |
 | `POST` | `/api/upgrades/projects/:id/profile_proposals` | Propose a profile field with its source. |
@@ -42,5 +43,5 @@ token buckets. A `fail` body carries the same usage; a model call that happened 
 
 ## Task kinds
 
-`answer`, `review`, `profile`, `scan`, `intent`, `repair`. The container's `CONSULTANT_KINDS`
+`answer`, `review`, `profile`, `scan`, `intent`, `repair`, `present`. The container's `CONSULTANT_KINDS`
 decides which ones it accepts; a task of another kind is not claimed.

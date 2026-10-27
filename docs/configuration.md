@@ -17,11 +17,12 @@ file.
 |---|---|---|
 | `CONSULTANT_INTERVAL` | `300` | Seconds between polls when no task is claimable. |
 | `CONSULTANT_CLAIM_LIMIT` | `1` | Tasks per claim, clamped to 1–5. |
-| `CONSULTANT_KINDS` | `answer,review,profile,scan,intent,repair` | Task kinds this container accepts. |
+| `CONSULTANT_KINDS` | `answer,review,profile,scan,intent,repair,present` | Task kinds this container accepts. |
 | `CONSULTANT_TASK_TIMEOUT` | `600` | Seconds one model run may take, clamped to 60–3600. |
 | `CONSULTANT_OPENCODE` | `opencode` | The model binary. |
 | `CONSULTANT_AGENT` | `consultant` | The OpenCode agent for a proposal. |
 | `CONSULTANT_REVIEW_AGENT` | `reviewer` | The agent for a review task. |
+| `CONSULTANT_PRESENT_AGENT` | `presenter` | The agent for a pull-request presentation. |
 | `CONSULTANT_REVIEW_MODEL` | empty | Optional different model for a review. |
 | `CONSULTANT_HOME` | the process home | State, records, scratch and the public mirrors live below it. |
 

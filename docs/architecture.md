@@ -28,7 +28,7 @@ a deployment with a broken key says so instead of retrying silently for ever.
 | File | What it decides |
 |---|---|
 | `lib/agents/consultant/config.rb` | The deployment's knobs, read once; the required URL and key, the model chain, the task kinds, the home. |
-| `lib/agents/consultant/client.rb` | The one HTTP client: control, claim, heartbeat, complete, fail, release, decisions, runs, profile proposals, reviews, usage. |
+| `lib/agents/consultant/client.rb` | The one HTTP client: control, claim, heartbeat, complete, fail, release, decisions, runs, presentations, profile proposals, reviews, usage. |
 | `lib/agents/consultant/prompt.rb` | The prompt text and the untrusted-content markers around report bodies and repository files. |
 | `lib/agents/consultant/validator.rb` | The boundary: what a model may propose and what it must refuse. |
 | `lib/agents/consultant/repository.rb` | The shallow, read-only public mirror, and `git show` for one file. |
@@ -54,6 +54,10 @@ a deployment with a broken key says so instead of retrying silently for ever.
 - **A review is a second agent, not a second container.** `reviewer.md` is a different prompt
   and, optionally, a different model. The service refuses a review whose provenance names the
   proposer's agent.
+- **A presentation is prose, not an effect.** `presenter.md` reads the run, the project's accepted
+  review guide and the deterministic body, and returns a summary and typed anchors. The service
+  checks every anchor against the run; the walker applies only a validated lead, and only while the
+  pull request body is still the one it wrote.
 
 ## Records
 

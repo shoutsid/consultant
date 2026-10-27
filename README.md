@@ -12,6 +12,7 @@ accepts a proposal unless an account has explicitly enabled a known-shape auto p
 | read a task and its question | yes | the service hands it the question, evidence and options |
 | propose an answer or a `maybe`/`cannot` stance | yes | typed effects and provenance, through `Decision::Answers` |
 | propose a project-profile field | yes | the account's review queue; `checks` and `env_names` are a person's |
+| write the lead of a delivered pull request | yes | a summary and typed review-focus anchors over the record; the service validates them, and it is not an effect |
 | record a run | no | a run is the walker's evidence, and the agent key is refused |
 | accept, dismiss or withdraw someone else's answer | no | the service refuses an agent key |
 | execute a command, run the suite, clone with a write token | no | v1 has no execution; a `needs: command` is a request |
@@ -84,6 +85,7 @@ account's total must include it.
 | `intent` | typed effects compiled from a person's prose, only after the person confirms |
 | `repair` | a `patch`/`config` proposal under a human goal; v1 cannot execute, so it says `cannot` when it needs a command |
 | `review` | a `safe`/`unsafe`/`needs` verdict on another task's proposal, with concerns and evidence; a different agent and prompt, never the proposer |
+| `present` | the lead of a delivered pull request: a summary and typed review-focus anchors over the run record and the project's review guide; not an effect and not a branch change |
 
 The service's `Upgrade::AgentPolicy` is authoritative: a project may narrow its account's policy but
 not widen it, the default is `off`, and consent precedes the first task.
@@ -91,9 +93,13 @@ not widen it, the default is `off`, and consent precedes the first task.
 `review` is a second agent, not a second container. `CONSULTANT_REVIEW_AGENT` names the reviewer
 (the image writes `reviewer.md` beside `consultant.md`), `CONSULTANT_REVIEW_MODEL` optionally names
 another model, and the service refuses a review whose provenance names the proposer's agent. The
-review prompt is `reviewer-prompt-1`; the proposer is `consultant-prompt-5`. The reviewer reads the
+review prompt is `reviewer-prompt-2`; the proposer is `consultant-prompt-6`. The reviewer reads the
 proposal's effects, the failed run's patch and the profile, and a `safe` verdict still only lets the
 account's policy accept provisionally — the next run is the verification.
+
+`present` is a third agent, `presenter.md`, with the same no-tools posture. The service validates
+every path, commit, decision, check and corpus report the model names against the fact sheet before
+the walker may apply the lead; the deterministic body remains when the draft is refused.
 
 ## Documentation
 

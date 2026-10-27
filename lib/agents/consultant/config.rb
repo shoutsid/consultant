@@ -11,8 +11,8 @@ module Agents
     # a project's policy may name a narrower one, and the service's task is the authority.
     class Config
       attr_reader :base_url, :key, :model, :interval, :claim_limit, :kinds, :task_timeout,
-        :opencode_binary, :agent, :review_agent, :review_model, :home, :state_dir, :records_dir,
-        :env
+        :opencode_binary, :agent, :review_agent, :present_agent, :review_model, :home, :state_dir,
+        :records_dir, :env
 
       def self.from_env(env = ENV)
         new(
@@ -21,12 +21,13 @@ module Agents
           model: env["CONSULTANT_MODEL"].to_s,
           interval: env.fetch("CONSULTANT_INTERVAL", "300").to_i,
           claim_limit: env.fetch("CONSULTANT_CLAIM_LIMIT", "1").to_i,
-          kinds: env.fetch("CONSULTANT_KINDS", "answer,review,profile,scan,intent,repair")
+          kinds: env.fetch("CONSULTANT_KINDS", "answer,review,profile,scan,intent,repair,present")
             .split(",").map(&:strip).reject(&:empty?),
           task_timeout: env.fetch("CONSULTANT_TASK_TIMEOUT", "600").to_i,
           opencode_binary: env.fetch("CONSULTANT_OPENCODE", "opencode"),
           agent: env.fetch("CONSULTANT_AGENT", "consultant"),
           review_agent: env.fetch("CONSULTANT_REVIEW_AGENT", "reviewer"),
+          present_agent: env.fetch("CONSULTANT_PRESENT_AGENT", "presenter"),
           review_model: env.fetch("CONSULTANT_REVIEW_MODEL", "").to_s,
           home: env.fetch("CONSULTANT_HOME", File.expand_path("~")),
           env: env
@@ -34,8 +35,8 @@ module Agents
       end
 
       def initialize(base_url:, key:, model:, interval:, claim_limit:, kinds:, task_timeout:,
-        opencode_binary:, agent:, review_agent: "reviewer", review_model: "",
-        home:, env: ENV)
+        opencode_binary:, agent:, review_agent: "reviewer", present_agent: "presenter",
+        review_model: "", home:, env: ENV)
         @base_url = base_url.to_s
         @key = key.to_s
         @model = model.to_s
@@ -46,6 +47,7 @@ module Agents
         @opencode_binary = opencode_binary.to_s
         @agent = agent.to_s
         @review_agent = review_agent.to_s
+        @present_agent = present_agent.to_s
         @review_model = review_model.to_s
         @home = Pathname.new(home.to_s)
         @env = env
@@ -59,6 +61,7 @@ module Agents
         raise ConfigError, "CONSULTANT_OPENCODE is required" if opencode_binary.empty?
         raise ConfigError, "CONSULTANT_AGENT is required" if agent.empty?
         raise ConfigError, "CONSULTANT_REVIEW_AGENT is required" if review_agent.empty?
+        raise ConfigError, "CONSULTANT_PRESENT_AGENT is required" if present_agent.empty?
 
         self
       end
