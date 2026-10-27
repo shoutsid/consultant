@@ -359,6 +359,8 @@ module Agents
         lines << ""
         lines << "Write the lead the maintainers need. Each review-focus anchor must name a path, " \
                  "commit, decision, check, report or change key that appears in the fact sheet. " \
+                 "Put the typed anchor only in `review_focus`; do not write `path:`, `commit:`, " \
+                 "`check:`, `report:` or `change:` in the prose summary. " \
                  "A claim the record does not support is worse than a shorter summary."
         lines << "Return the JSON object now."
         lines.join("\n")
