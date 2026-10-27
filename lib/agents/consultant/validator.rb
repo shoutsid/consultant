@@ -315,7 +315,7 @@ module Agents
             return [nil, "the #{label} narrative carries raw HTML"] if
               text.match?(/<\/?[A-Za-z][^>]*>/)
             return [nil, "the #{label} narrative carries a heading"] if text.match?(/^\s*#/m)
-            if text.match?(/^\s*(?:[-*+>]\s|\|\s?|\d+\.\s)/m)
+            if text.include?("|") || text.match?(/^\s*(?:[-*+>]\s|\|\s?|\d+\.\s)/m)
               return [nil, "the #{label} narrative carries a list or a table; write prose paragraphs"]
             end
             return [nil, "the #{label} narrative carries a code span or fence; write prose " \
