@@ -54,4 +54,24 @@ class RunnerTest < Minitest::Test
       assert_equal 6, usage["tokens_out"]
     end
   end
+
+  def test_a_provider_error_event_is_reported_with_its_sentence
+    Dir.mktmpdir do |dir|
+      binary = File.join(dir, "opencode")
+      File.write(binary, <<~SH)
+        #!/bin/sh
+        echo '{"type":"error","sessionID":"ses_test","error":{"type":"provider.free-limit","message":"Free usage limit reached.","status":429,"retryAfterMs":120000}}'
+        exit 1
+      SH
+      File.chmod(0o755, binary)
+      runner = Agents::Consultant::Runner.new(binary: binary, agent: "consultant",
+        scratch: File.join(dir, "scratch"))
+
+      text, error = runner.run("prompt", model: "opencode/deepseek-v4.1-flash-free")
+
+      assert_nil text
+      assert_equal "Free usage limit reached. (retry after 120s)", error.message
+      assert error.retryable?
+    end
+  end
 end

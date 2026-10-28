@@ -62,6 +62,11 @@ module Agents
         stdout, stderr, status = capture(argv)
         return [nil, ModelError.new("the model process was killed after #{@timeout}s",
           retryable: true), nil] if status == :timeout
+        # **The stream can carry a provider error on a failed exit.** A free-limit 429 is the one
+        # that matters here: it is what the chain's paid fallback exists for, and the CLI writes the
+        # sentence to stdout rather than stderr.
+        provider_error = stream_error(stdout)
+        return [nil, provider_error, nil] if provider_error
         return [nil, ModelError.new("the model process failed: #{stderr.to_s.lines.last.to_s.strip}",
           retryable: true), nil] unless status.success?
 
@@ -76,6 +81,29 @@ module Agents
       end
 
       private
+
+      # The provider's own sentence and the retry hint, when the stream carries an error event.
+      # `provider.free-limit` is the common one: the CLI exits nonzero and writes a 429 with a
+      # `retryAfterMs`. The message is bounded because it becomes a task failure sentence.
+      def stream_error(stdout)
+        stdout.to_s.each_line do |line|
+          event = JSON.parse(line)
+          next unless event.is_a?(Hash)
+
+          error = event["error"]
+          next unless error.is_a?(Hash)
+
+          message = error["message"].to_s.strip
+          next if message.empty?
+
+          retry_after = error["retryAfterMs"].to_i
+          message = "#{message} (retry after #{retry_after / 1000}s)" if retry_after.positive?
+          return ModelError.new(message[0, 500], retryable: true)
+        rescue JSON::ParserError
+          next
+        end
+        nil
+      end
 
       # **The JSON stream is the model's answer and its session id.** The text parts are the
       # response; the id is what `session export` reads the token buckets from. A binary that does
