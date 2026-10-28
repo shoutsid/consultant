@@ -95,22 +95,22 @@ module Agents
           Prompt.build(task, mode: mode,
             repository: repository.is_a?(Hash) ? repository : nil, run: run_detail)
         end
-        model = mode == "review" ? review_model_for(task) : model_for(task)
+        model_chain = mode == "review" ? review_model_chain_for(task) : model_chain_for(task)
         started = @clock.now
-        text, error, usage = if mode == "review"
-          @runner.run(prompt, model: model, mode: mode, agent: @config.review_agent)
+        agent = if mode == "review"
+          @config.review_agent
         elsif mode == "present"
-          @runner.run(prompt, model: model, mode: mode, agent: @config.present_agent)
-        else
-          @runner.run(prompt, model: model, mode: mode)
+          @config.present_agent
         end
+        text, error, usage, model, calls = run_with_fallback(prompt, models: model_chain,
+          mode: mode, agent: agent, task_id: task_id, lease: lease)
         seconds = (@clock.now - started).to_i
         tokens_in = usage.is_a?(Hash) ? usage["tokens_in"].to_i : 0
         tokens_out = usage.is_a?(Hash) ? usage["tokens_out"].to_i : 0
 
         if error
           fail_task(task_id, lease, error.message, retryable: error.retryable?,
-            model: model, usage: usage, seconds: seconds)
+            model: model, usage: usage, seconds: seconds, calls: calls)
           return nil
         end
 
@@ -133,7 +133,7 @@ module Agents
         when "profile" then post_profile(task, proposal, model: model)
         when "scan" then post_scan(proposal)
         when "review" then post_review(task, question, proposal, model: model,
-          seconds: seconds, tokens_in: tokens_in, tokens_out: tokens_out)
+          seconds: seconds, calls: calls, tokens_in: tokens_in, tokens_out: tokens_out)
         when "present" then post_presentation(proposal, model: model)
         else post_answer(task, question, proposal, model: model)
         end
@@ -150,7 +150,7 @@ module Agents
         # task that is already `completed`.
         unless mode == "review"
           @client.complete(task_id, lease, result: posted, model: model,
-            tokens_in: tokens_in, tokens_out: tokens_out, calls: 1, seconds: seconds)
+            tokens_in: tokens_in, tokens_out: tokens_out, calls: calls, seconds: seconds)
         end
         record(task, prompt: prompt, text: text, result: posted, model: model, usage: usage)
         log("task #{task_id} (#{mode}) completed: #{posted.inspect}")
@@ -158,7 +158,8 @@ module Agents
       rescue Error => e
         fail_task(task_id, lease, e.message, retryable: e.retryable?,
           model: defined?(model) ? model : nil, usage: defined?(usage) ? usage : nil,
-          seconds: defined?(seconds) ? seconds : 0) if task_id && lease
+          seconds: defined?(seconds) ? seconds : 0,
+          calls: defined?(calls) ? calls : 1) if task_id && lease
         log("task #{task_id} failed: #{e.message}")
         nil
       end
@@ -270,7 +271,8 @@ module Agents
 
       # **The review POST is the completion.** The service stores the verdict, completes the lease
       # and runs the gate; the loop must not call `complete` again on a task that is already done.
-      def post_review(task, question, proposal, model:, seconds: 0, tokens_in: 0, tokens_out: 0)
+      def post_review(task, question, proposal, model:, seconds: 0, calls: 1, tokens_in: 0,
+        tokens_out: 0)
         decision_id = question["id"].to_s
         answer_id = task.dig("context", "answer_id").to_s
         return "the review task names no decision question" if decision_id.empty?
@@ -287,7 +289,7 @@ module Agents
           # `complete` route never sees the spend; the endpoint records it from these fields.
           "tokens_in" => tokens_in.to_i,
           "tokens_out" => tokens_out.to_i,
-          "calls" => 1,
+          "calls" => calls.to_i,
           "seconds" => seconds.to_i
         }
         @client.review_answer(decision_id, answer_id, payload)
@@ -325,27 +327,58 @@ module Agents
 
       # **A failed task still carries its spend.** The model ran, the validator or the service
       # refused its output, and the account's total must include the tokens that produced it.
-      def fail_task(task_id, lease, message, retryable:, model: nil, usage: nil, seconds: 0)
+      def fail_task(task_id, lease, message, retryable:, model: nil, usage: nil, seconds: 0,
+        calls: 1)
         tokens_in = usage.is_a?(Hash) ? usage["tokens_in"].to_i : 0
         tokens_out = usage.is_a?(Hash) ? usage["tokens_out"].to_i : 0
         @client.fail(task_id, lease, error: message, retryable: retryable, model: model,
-          tokens_in: tokens_in, tokens_out: tokens_out, calls: usage ? 1 : 0,
+          tokens_in: tokens_in, tokens_out: tokens_out, calls: usage ? calls.to_i : 0,
           seconds: seconds)
       rescue Error => e
         log("could not report the failure for #{task_id}: #{e.message}")
       end
 
-      def model_for(task)
+      # **The chain is read left to right, and the free model is first.** A project's policy may
+      # name its own chain; otherwise the deployment's `CONSULTANT_MODEL` is the one. One model is
+      # a one-entry chain, and an empty value leaves the choice to opencode's own configuration.
+      def model_chain_for(task)
         policy = task["policy"].is_a?(Hash) ? task["policy"] : {}
         text = policy["model"].to_s
-        text.empty? ? @config.model : text
+        parse_models(text.empty? ? @config.model : text)
       end
 
-      def review_model_for(task)
+      def review_model_chain_for(task)
         policy = task["policy"].is_a?(Hash) ? task["policy"] : {}
         text = policy["review_model"].to_s
         text = @config.review_model if text.empty?
-        text.empty? ? model_for(task) : text
+        text.empty? ? model_chain_for(task) : parse_models(text)
+      end
+
+      def parse_models(text) = text.to_s.split(/[,\s]+/).reject(&:empty?)
+
+      # **A failed free route is the next model's turn, not the task's failure.** The chain is
+      # tried in order on a retryable model error (a rate limit, an unavailable free model, a
+      # provider outage or a timeout); a non-retryable error stops at once, and a validator
+      # refusal never spends the paid fallback because the model did answer. The lease is
+      # heartbeated before a fallback so a chain of long attempts is not claimed by another
+      # consultant halfway through.
+      def run_with_fallback(prompt, models:, mode:, agent: nil, task_id: nil, lease: nil)
+        chain = Array(models).map(&:to_s).reject(&:empty?)
+        chain = [nil] if chain.empty?
+        last_error = nil
+        calls = 0
+        chain.each_with_index do |model, index|
+          calls += 1
+          text, error, usage = @runner.run(prompt, model: model, mode: mode, agent: agent)
+          return [text, nil, usage, model, calls] if error.nil?
+          return [nil, error, nil, model, calls] unless error.retryable? && index < chain.length - 1
+
+          last_error = error
+          log("model #{model || 'the default'} failed (#{error.message}); " \
+              "trying #{chain[index + 1] || 'the default'}")
+          heartbeat(task_id, lease) if task_id && lease
+        end
+        [nil, last_error || ModelError.new("the model chain produced no answer"), nil, chain.last, calls]
       end
 
       def record(task, prompt:, text:, result: nil, error: nil, model: nil, usage: nil)

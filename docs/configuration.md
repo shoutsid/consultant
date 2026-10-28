@@ -9,7 +9,7 @@ file.
 |---|---|
 | `AGENTS_URL` | The service base URL. On a compose network this is the service name, not the public hostname. |
 | `AGENTS_KEY` | An agent key. It is not an admin token and cannot accept, dismiss, promote, run, file or verify. |
-| `CONSULTANT_MODEL` | The deployment's fallback model chain. A project's policy may name a narrower one. |
+| `CONSULTANT_MODEL` | The deployment's fallback model chain, comma- or space-separated and read left to right. A project's policy may name a narrower one. Put the free model first and the paid one after it. |
 
 ## The loop
 
@@ -23,8 +23,23 @@ file.
 | `CONSULTANT_AGENT` | `consultant` | The OpenCode agent for a proposal. |
 | `CONSULTANT_REVIEW_AGENT` | `reviewer` | The agent for a review task. |
 | `CONSULTANT_PRESENT_AGENT` | `presenter` | The agent for a pull-request presentation. |
-| `CONSULTANT_REVIEW_MODEL` | empty | Optional different model for a review. |
+| `CONSULTANT_REVIEW_MODEL` | empty | Optional different chain for a review; empty uses the proposal's chain. |
 | `CONSULTANT_HOME` | the process home | State, records, scratch and the public mirrors live below it. |
+
+## Model fallback
+
+`CONSULTANT_MODEL` (and a project's `model` policy, when it names one) is a chain, read left to
+right. Put a free model first and the paid model after it:
+
+```text
+CONSULTANT_MODEL=opencode/deepseek-v4.1-flash-free,opencode/glm-5.3-flash-free,opencode-go/deepseek-v4.1-flash
+```
+
+A retryable model-process error — a usage limit, a rate limit, an unavailable free model, a
+provider outage or a timeout — moves to the next model in the chain. A non-retryable error stops at
+once, and a validator refusal never spends the paid fallback because the model did answer. The task
+lease is heartbeated before each fallback, and the task, record and spend name the model that
+actually answered.
 
 ## Command line
 

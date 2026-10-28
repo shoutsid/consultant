@@ -48,15 +48,20 @@ class LoopTest < Minitest::Test
   class FakeRunner
     attr_reader :calls
 
-    def initialize(text: nil, error: nil, usage: nil)
+    def initialize(text: nil, error: nil, usage: nil, responses: nil)
       @text = text
       @error = error
       @usage = usage
+      @responses = responses
       @calls = []
     end
 
     def run(prompt, model: nil, mode: nil, agent: nil)
       @calls << { model: model, mode: mode, agent: agent }
+      if @responses
+        text, error, usage = @responses.fetch(model)
+        return [text, error, usage]
+      end
       return [nil, @error, nil] if @error
 
       [@text, nil, @usage]
@@ -169,6 +174,87 @@ class LoopTest < Minitest::Test
       failed = client.calls.find { |call| call.first == :fail }
       assert_equal true, failed[2][:retryable]
       assert_equal "timeout", failed[2][:error]
+    end
+  end
+
+  def test_the_deployment_chain_is_read_when_the_task_policy_names_none
+    Dir.mktmpdir do |dir|
+      config = Agents::Consultant::Config.new(
+        base_url: "http://service:8001", key: "afy_x",
+        model: "free/config,paid/config", interval: 0, claim_limit: 1,
+        kinds: %w[answer], task_timeout: 60, opencode_binary: "true",
+        agent: "consultant", home: dir
+      )
+      subject = Agents::Consultant::Loop.new(client: FakeClient.new,
+        runner: FakeRunner.new(text: answer_text), config: config,
+        out: StringIO.new, err: StringIO.new)
+
+      assert_equal %w[free/config paid/config], subject.send(:model_chain_for, { "policy" => {} })
+      assert_equal %w[review/free review/paid],
+        subject.send(:review_model_chain_for,
+          { "policy" => { "review_model" => "review/free review/paid" } })
+    end
+  end
+
+  def test_a_free_model_failure_falls_back_to_the_next_model
+    Dir.mktmpdir do |dir|
+      error = Agents::Consultant::ModelError.new("Rate limit exceeded. Please try again later.",
+        retryable: true)
+      runner = FakeRunner.new(responses: {
+        "free/model" => [nil, error, nil],
+        "paid/model" => [answer_text, nil, { "tokens_in" => 3, "tokens_out" => 4 }]
+      })
+      client = FakeClient.new
+      subject = loop(client: client, runner: runner, dir: dir)
+
+      subject.process(task.merge("policy" => { "policy" => "propose",
+        "model" => "free/model,paid/model" }))
+
+      assert_equal %w[free/model paid/model], runner.calls.map { |call| call[:model] }
+      complete = client.calls.find { |call| call.first == :complete }
+      assert_equal "paid/model", complete[2][:model]
+      assert_equal 2, complete[2][:calls]
+      assert_equal 3, complete[2][:tokens_in]
+      refute client.calls.any? { |call| call.first == :fail }
+    end
+  end
+
+  def test_a_non_retryable_model_error_does_not_spend_the_fallback
+    Dir.mktmpdir do |dir|
+      error = Agents::Consultant::ModelError.new("the binary is not configured", retryable: false)
+      runner = FakeRunner.new(responses: {
+        "free/model" => [nil, error, nil],
+        "paid/model" => [answer_text, nil, nil]
+      })
+      client = FakeClient.new
+      subject = loop(client: client, runner: runner, dir: dir)
+
+      subject.process(task.merge("policy" => { "policy" => "propose",
+        "model" => "free/model,paid/model" }))
+
+      assert_equal ["free/model"], runner.calls.map { |call| call[:model] }
+      failed = client.calls.find { |call| call.first == :fail }
+      assert_equal false, failed[2][:retryable]
+      assert_equal "free/model", failed[2][:model]
+    end
+  end
+
+  def test_a_validator_refusal_does_not_spend_the_fallback
+    Dir.mktmpdir do |dir|
+      bad = answer_text.sub("app/models/user.rb", "spec/models/user_spec.rb")
+      runner = FakeRunner.new(responses: {
+        "free/model" => [bad, nil, nil],
+        "paid/model" => [answer_text, nil, nil]
+      })
+      client = FakeClient.new
+      subject = loop(client: client, runner: runner, dir: dir)
+
+      subject.process(task.merge("policy" => { "policy" => "propose",
+        "model" => "free/model,paid/model" }))
+
+      assert_equal ["free/model"], runner.calls.map { |call| call[:model] }
+      failed = client.calls.find { |call| call.first == :fail }
+      assert_equal false, failed[2][:retryable]
     end
   end
 
