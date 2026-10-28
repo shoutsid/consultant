@@ -32,7 +32,7 @@ file.
 right. Put a free model first and the paid model after it:
 
 ```text
-CONSULTANT_MODEL=opencode/deepseek-v4.1-flash-free,opencode/glm-5.3-flash-free,opencode-go/deepseek-v4.1-flash
+CONSULTANT_MODEL=opencode/deepseek-v4.1-flash-free,opencode-go/deepseek-v4.1-flash
 ```
 
 A retryable model-process error — a usage limit, a rate limit, an unavailable free model, a

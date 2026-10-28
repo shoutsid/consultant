@@ -215,6 +215,8 @@ class LoopTest < Minitest::Test
       assert_equal "paid/model", complete[2][:model]
       assert_equal 2, complete[2][:calls]
       assert_equal 3, complete[2][:tokens_in]
+      assert_equal 2, client.calls.count { |call| call.first == :heartbeat },
+        "the lease is extended before the fallback model runs"
       refute client.calls.any? { |call| call.first == :fail }
     end
   end
