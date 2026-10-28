@@ -75,6 +75,12 @@ output, reasoning and cache buckets, and the loop sends them on `complete` and o
 validator or the service refuses still records its spend: the model call already happened, and the
 account's total must include it.
 
+**The model is a chain, and the free route is first.** `CONSULTANT_MODEL` and a project's `model`
+policy are comma- or space-separated and read left to right. A retryable provider error — the free
+limit's 429, a rate limit, an unavailable model, an outage or a timeout — moves to the next entry;
+free first, paid last. A non-retryable error or a validator refusal stops at once. The lease is
+heartbeated before a fallback, and the task records the model and call count that answered.
+
 ## Modes
 
 | Mode | Answer |
