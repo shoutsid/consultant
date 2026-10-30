@@ -18,8 +18,11 @@ the key and the loop.
 
 ## The model is not authenticated
 
-The provider credential is in the mounted home, not the image. Run `opencode auth login` in the
-container and check that `CONSULTANT_HOME` is the mounted volume.
+The provider key belongs to the account. An account administrator connects it at
+`/admin/model-access`; the agent key also needs the `model_access` grant
+(`bin/rails 'model_access:grant[email]'`). A 409 from `model_access` names the provider with no
+usable key; a 403 means the grant is missing. The client fails the task rather than running on an
+unknown credential.
 
 ## The service says the project is paused
 

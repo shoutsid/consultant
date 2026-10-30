@@ -72,6 +72,10 @@ module Agents
         question = task["question"].is_a?(Hash) ? task["question"] : {}
         mode = task["kind"].to_s
         heartbeat(task_id, lease)
+        # **The provider fragment is read after the claim, never before.** The service releases a
+        # key only while this task's lease is live; a fetch at startup would be a fetch for no task
+        # and a key held longer than the work.
+        access = model_access_for(task_id, lease)
         repository, repository_problem = if mode == "present"
           [nil, nil]
         else
@@ -102,15 +106,19 @@ module Agents
         elsif mode == "present"
           @config.present_agent
         end
-        text, error, usage, model, calls = run_with_fallback(prompt, models: model_chain,
-          mode: mode, agent: agent, task_id: task_id, lease: lease)
+        text, error, usage, model, calls = access.with_config do |run_env|
+          run_with_fallback(prompt, models: model_chain, mode: mode, agent: agent,
+            task_id: task_id, lease: lease, env: run_env)
+        end
+        credential_id = access.credential_id_for(model)
         seconds = (@clock.now - started).to_i
         tokens_in = usage.is_a?(Hash) ? usage["tokens_in"].to_i : 0
         tokens_out = usage.is_a?(Hash) ? usage["tokens_out"].to_i : 0
 
         if error
           fail_task(task_id, lease, error.message, retryable: error.retryable?,
-            model: model, usage: usage, seconds: seconds, calls: calls)
+            model: model, usage: usage, seconds: seconds, calls: calls,
+            model_credential_id: credential_id)
           return nil
         end
 
@@ -125,7 +133,7 @@ module Agents
           debug("validator refused #{task_id}: #{problem}", text)
           record(task, prompt: prompt, text: text, error: problem, model: model, usage: usage)
           fail_task(task_id, lease, problem, retryable: false,
-            model: model, usage: usage, seconds: seconds)
+            model: model, usage: usage, seconds: seconds, model_credential_id: credential_id)
           return nil
         end
 
@@ -133,7 +141,8 @@ module Agents
         when "profile" then post_profile(task, proposal, model: model)
         when "scan" then post_scan(proposal)
         when "review" then post_review(task, question, proposal, model: model,
-          seconds: seconds, calls: calls, tokens_in: tokens_in, tokens_out: tokens_out)
+          seconds: seconds, calls: calls, tokens_in: tokens_in, tokens_out: tokens_out,
+          model_credential_id: credential_id)
         when "present" then post_presentation(proposal, model: model)
         else post_answer(task, question, proposal, model: model)
         end
@@ -141,7 +150,7 @@ module Agents
           debug("service refused #{task_id}: #{posted}", text)
           record(task, prompt: prompt, text: text, error: posted, model: model, usage: usage)
           fail_task(task_id, lease, posted, retryable: false,
-            model: model, usage: usage, seconds: seconds)
+            model: model, usage: usage, seconds: seconds, model_credential_id: credential_id)
           return nil
         end
 
@@ -150,7 +159,8 @@ module Agents
         # task that is already `completed`.
         unless mode == "review"
           @client.complete(task_id, lease, result: posted, model: model,
-            tokens_in: tokens_in, tokens_out: tokens_out, calls: calls, seconds: seconds)
+            tokens_in: tokens_in, tokens_out: tokens_out, calls: calls, seconds: seconds,
+            model_credential_id: credential_id)
         end
         record(task, prompt: prompt, text: text, result: posted, model: model, usage: usage)
         log("task #{task_id} (#{mode}) completed: #{posted.inspect}")
@@ -159,7 +169,8 @@ module Agents
         fail_task(task_id, lease, e.message, retryable: e.retryable?,
           model: defined?(model) ? model : nil, usage: defined?(usage) ? usage : nil,
           seconds: defined?(seconds) ? seconds : 0,
-          calls: defined?(calls) ? calls : 1) if task_id && lease
+          calls: defined?(calls) ? calls : 1,
+          model_credential_id: defined?(credential_id) ? credential_id : nil) if task_id && lease
         log("task #{task_id} failed: #{e.message}")
         nil
       end
@@ -203,6 +214,24 @@ module Agents
           return [nil, problem]
         end
         [snapshot, nil]
+      end
+
+      # **A 404 means this deployment predates the route, not that this task has no keys.** A
+      # service older than the vault answers `not_found`; the client keeps the legacy
+      # `opencode` configuration and runs, and an operator upgrading the service gets the vault
+      # on the next task. Every other refusal is the task's: a missing grant or credential is a
+      # person's to fix, and a 5xx is the service being unavailable.
+      def model_access_for(task_id, lease)
+        return ModelAccess.empty unless @client.respond_to?(:model_access)
+
+        payload = @client.model_access(task_id, lease)
+        directory = @config.state_dir.join(ModelAccess::DIRECTORY, task_id)
+        ModelAccess.new(payload: payload, directory: directory)
+      rescue Error => e
+        raise unless e.status == 404
+
+        log("the service does not serve model access (#{e.message}); using the client's own config")
+        ModelAccess.empty
       end
 
       def read_control
@@ -272,7 +301,7 @@ module Agents
       # **The review POST is the completion.** The service stores the verdict, completes the lease
       # and runs the gate; the loop must not call `complete` again on a task that is already done.
       def post_review(task, question, proposal, model:, seconds: 0, calls: 1, tokens_in: 0,
-        tokens_out: 0)
+        tokens_out: 0, model_credential_id: nil)
         decision_id = question["id"].to_s
         answer_id = task.dig("context", "answer_id").to_s
         return "the review task names no decision question" if decision_id.empty?
@@ -292,6 +321,9 @@ module Agents
           "calls" => calls.to_i,
           "seconds" => seconds.to_i
         }
+        # **A review POST has no credential field in this service version.** It completes its own
+        # task, so its tokens are counted, but the route does not yet accept the key id; sending
+        # one would turn a valid review into a 422.
         @client.review_answer(decision_id, answer_id, payload)
         { "answer_id" => answer_id, "verdict" => proposal["verdict"] }
       rescue Error => e
@@ -328,12 +360,12 @@ module Agents
       # **A failed task still carries its spend.** The model ran, the validator or the service
       # refused its output, and the account's total must include the tokens that produced it.
       def fail_task(task_id, lease, message, retryable:, model: nil, usage: nil, seconds: 0,
-        calls: 1)
+        calls: 1, model_credential_id: nil)
         tokens_in = usage.is_a?(Hash) ? usage["tokens_in"].to_i : 0
         tokens_out = usage.is_a?(Hash) ? usage["tokens_out"].to_i : 0
         @client.fail(task_id, lease, error: message, retryable: retryable, model: model,
           tokens_in: tokens_in, tokens_out: tokens_out, calls: usage ? calls.to_i : 0,
-          seconds: seconds)
+          seconds: seconds, model_credential_id: model_credential_id)
       rescue Error => e
         log("could not report the failure for #{task_id}: #{e.message}")
       end
@@ -362,14 +394,15 @@ module Agents
       # refusal never spends the paid fallback because the model did answer. The lease is
       # heartbeated before a fallback so a chain of long attempts is not claimed by another
       # consultant halfway through.
-      def run_with_fallback(prompt, models:, mode:, agent: nil, task_id: nil, lease: nil)
+      def run_with_fallback(prompt, models:, mode:, agent: nil, task_id: nil, lease: nil, env: {})
         chain = Array(models).map(&:to_s).reject(&:empty?)
         chain = [nil] if chain.empty?
         last_error = nil
         calls = 0
         chain.each_with_index do |model, index|
           calls += 1
-          text, error, usage = @runner.run(prompt, model: model, mode: mode, agent: agent)
+          text, error, usage = @runner.run(prompt, model: model, mode: mode, agent: agent,
+            env: env)
           return [text, nil, usage, model, calls] if error.nil?
           return [nil, error, nil, model, calls] unless error.retryable? && index < chain.length - 1
 

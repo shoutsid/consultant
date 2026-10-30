@@ -10,13 +10,30 @@ class LoopTest < Minitest::Test
   class FakeClient
     attr_reader :calls
 
-    def initialize(answer: { "proposed_answer" => "a1" }, profile: { "id" => "p1" })
+    def initialize(answer: { "proposed_answer" => "a1" }, profile: { "id" => "p1" },
+      model_access: nil, model_access_error: nil)
       @answer = answer
       @profile = profile
+      @model_access = model_access
+      @model_access_error = model_access_error
       @calls = []
     end
 
     def control = { "paused" => false, "reason" => nil }
+
+    def model_access(task_id, lease_token)
+      @calls << [:model_access, task_id, lease_token]
+      raise @model_access_error if @model_access_error
+
+      @model_access || {
+        "chain" => ["provider/model"], "source" => "project",
+        "providers" => { "provider" => { "name" => "Provider",
+          "models" => [{ "id" => "model", "name" => "Model" }] } },
+        "keys" => { "provider" => { "credential_id" => "cred-1",
+          "env_name" => "AGENTS_MODEL_KEY_deadbeef", "secret" => "sk-test" } }
+      }
+    end
+
     def claim(**) = { "tasks" => [] }
     def heartbeat(*args, **kwargs) = @calls << [:heartbeat, args, kwargs]
     def complete(*args, **kwargs) = @calls << [:complete, args, kwargs]
@@ -56,8 +73,8 @@ class LoopTest < Minitest::Test
       @calls = []
     end
 
-    def run(prompt, model: nil, mode: nil, agent: nil)
-      @calls << { model: model, mode: mode, agent: agent }
+    def run(prompt, model: nil, mode: nil, agent: nil, env: nil)
+      @calls << { model: model, mode: mode, agent: agent, env: env }
       if @responses
         text, error, usage = @responses.fetch(model)
         return [text, error, usage]
@@ -143,6 +160,46 @@ class LoopTest < Minitest::Test
       assert_includes complete[2][:result].dig("narrative", "what_moved"), "This rung moves"
       assert_equal "presenter", runner.calls.first[:agent]
       refute client.calls.any? { |call| call.first == :answer }
+    end
+  end
+
+  # **The fragment is read after the claim, and the completion names the key that paid.** The
+  # config lives for one task: the block that runs the model removes it even when the task fails.
+  def test_a_task_reads_the_provider_fragment_after_claiming_and_names_the_credential
+    Dir.mktmpdir do |dir|
+      client = FakeClient.new
+      runner = FakeRunner.new(text: answer_text)
+      subject = loop(client: client, runner: runner, dir: dir)
+
+      subject.process(task)
+
+      kinds = client.calls.map(&:first)
+      assert_operator kinds.index(:model_access), :>, kinds.index(:heartbeat),
+        "the key was fetched before the lease was confirmed"
+      complete = client.calls.find { |call| call.first == :complete }
+      assert_equal "cred-1", complete[2][:model_credential_id]
+      assert_equal "sk-test", runner.calls.first[:env]["AGENTS_MODEL_KEY_deadbeef"]
+      refute Dir.exist?(File.join(dir, "state", "model-access", "task-1")),
+        "the per-task config outlived the task"
+    end
+  end
+
+  # **A missing key is the service's sentence, and the model is not started.** The refusal names
+  # a provider a person has to connect; retrying the same task cannot fix it.
+  def test_a_refused_provider_fragment_fails_the_task_without_calling_the_model
+    Dir.mktmpdir do |dir|
+      error = Agents::Consultant::Error.new("nano-gpt has no usable credential",
+        status: 409, retryable: false)
+      client = FakeClient.new(model_access_error: error)
+      runner = FakeRunner.new(text: answer_text)
+      subject = loop(client: client, runner: runner, dir: dir)
+
+      subject.process(task)
+
+      assert_empty runner.calls, "the model ran without a credential"
+      failed = client.calls.find { |call| call.first == :fail }
+      assert_equal "nano-gpt has no usable credential", failed[2][:error]
+      assert_equal false, failed[2][:retryable]
     end
   end
 

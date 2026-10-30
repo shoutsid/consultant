@@ -22,9 +22,10 @@ accepts a proposal unless an account has explicitly enabled a known-shape auto p
 | write a whole-file `file` effect | no | whole-file content is the easiest secret/private-code leak |
 
 The container has no `DATABASE_URL`, no database password, no `ADMIN_TOKEN`, no Docker socket and no
-mount of the walker's cache or worktree. Its one credential is the agent key; the model provider's
-credential lives in the mounted home (`consultant_home`), not in an image layer. The same volume
-holds the shallow public mirrors (`repos/`), which are a cache and never evidence.
+mount of the walker's cache or worktree. Its one service credential is the agent key; the account's
+provider keys are fetched from the service after a task is claimed, held only in the model process's
+environment, and never written into the mounted home. The same volume holds the shallow public
+mirrors (`repos/`), which are a cache and never evidence.
 
 ## Run it
 
@@ -33,10 +34,10 @@ From the service checkout:
 ```sh
 # one key, once, in the service container
 docker compose run --rm --no-deps service bin/rails 'agent:register_operator[consultant,consultant@example.test]'
+docker compose run --rm --no-deps service bin/rails 'model_access:grant[consultant@example.test]'
 
-# put the key in .env as CONSULTANT_KEY, then
+# put the key in .env as CONSULTANT_KEY, connect a provider at /admin/model-access, then
 docker compose --profile consultant up -d consultant
-docker compose exec consultant opencode auth login    # the model provider, once
 ```
 
 `./scripts/dev.sh consultant` runs the suite from the service checkout. This repository's own

@@ -13,17 +13,19 @@ docker compose run --rm --no-deps service \
 ```
 
 Put the key in the deployment's environment as `CONSULTANT_KEY`; the compose file maps it to
-`AGENTS_KEY` inside the consultant container. The account the key belongs to must be
-unpaused, and a project's policy must be on and consenting before the walk asks it anything.
+`AGENTS_KEY` inside the consultant container. Grant it `model_access` with `bin/rails
+'model_access:grant[consultant@example.test]'`; without the grant the key cannot fetch a provider
+secret and a task fails rather than running on an unknown credential. The account the key belongs to
+must be unpaused, and a project's policy must be on and consenting before the walk asks it anything.
 
 ## The model side
 
-The provider credential is not in the image. It lives in the mounted `consultant_home`, so an
-operator signs in once:
-
-```bash
-docker compose exec consultant opencode auth login
-```
+Provider keys belong to the account and live in the service's encrypted vault (`/admin/model-access`).
+After claiming a task, the consultant fetches only the providers its effective chain names, writes a
+per-task `opencode.json` referencing environment variables, and removes the directory when the task
+ends. A deployment-wide imported credential is the fallback for accounts with no key of their own.
+No `opencode auth login` state is required, and the run's empty XDG directories mean a stale one in
+`consultant_home` is not used.
 
 The image installs `opencode` unless it is built with `--build-arg WITH_AGENT=0`. A build
 without it is still a valid client: it refuses a task with a sentence rather than running a

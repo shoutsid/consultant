@@ -46,7 +46,7 @@ module Agents
       # `retryable?` says whether the provider or the machine failed (true) or the model's output
       # was unusable (false). `usage` is the session's token and cost report, or nil when the
       # provider did not expose one.
-      def run(prompt, model: nil, mode: nil, agent: nil)
+      def run(prompt, model: nil, mode: nil, agent: nil, env: {})
         raise ConfigError, "the opencode binary is required" if @binary.empty?
         raise ConfigError, "the scratch directory is required" if @scratch.empty?
 
@@ -59,7 +59,7 @@ module Agents
         argv = [@binary, "run", "--format", "json", "--agent", name]
         argv += ["--model", model] unless model.to_s.empty?
         argv += ["--file", prompt_path, MESSAGE]
-        stdout, stderr, status = capture(argv)
+        stdout, stderr, status = capture(argv, env)
         return [nil, ModelError.new("the model process was killed after #{@timeout}s",
           retryable: true), nil] if status == :timeout
         # **The stream can carry a provider error on a failed exit.** A free-limit 429 is the one
@@ -154,8 +154,16 @@ module Agents
         path
       end
 
-      def capture(argv)
+      def capture(argv, overrides = {})
         env = @env.to_h.slice(*ENV_ALLOWLIST)
+        # **Only the model-key names the service generates may cross.** The override hash is
+        # built by `ModelAccess` from the release; filtering it here means a future caller
+        # cannot turn this method into a general environment injection.
+        overrides.to_h.each do |name, value|
+          next unless ENV_ALLOWLIST.include?(name) || name.to_s.match?(/\AAGENTS_MODEL_KEY_[0-9a-f]{8}\z/)
+
+          env[name.to_s] = value.to_s
+        end
         Open3.popen3(env, *argv, chdir: @scratch) do |stdin, stdout, stderr, wait|
           # **The prompt is a file, not stdin.** Writing it to stdin was harmless while the
           # process kept stdin open; the current opencode closes it at startup and the write

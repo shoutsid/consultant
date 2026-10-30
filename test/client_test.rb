@@ -46,6 +46,20 @@ class ClientTest < Minitest::Test
     assert_equal 1, JSON.parse(request.body)["limit"]
   end
 
+  def test_a_model_access_read_posts_the_lease_and_names_the_task
+    http = FakeHttp.new(response(Net::HTTPOK, JSON.generate("chain" => ["provider/model"],
+      "keys" => { "provider" => { "credential_id" => "c1", "secret" => "sk" } })))
+    subject = Agents::Consultant::Client.new(base_url: "http://service:8001",
+      key: "afy_agent_x", http: http)
+
+    body = subject.model_access("t1", "lease-1")
+
+    assert_equal ["provider/model"], body["chain"]
+    uri, request = http.requests.first
+    assert_equal "/api/upgrades/agent/tasks/t1/model_access", uri.path
+    assert_equal "lease-1", JSON.parse(request.body)["lease_token"]
+  end
+
   def test_a_4xx_refusal_is_not_retryable_and_a_5xx_is
     subject = client(response(Net::HTTPUnprocessableEntity,
       JSON.generate("error" => { "message" => "the project is off" }), code: "422"))

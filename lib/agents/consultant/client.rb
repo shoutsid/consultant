@@ -44,22 +44,33 @@ module Agents
           { "lease_token" => lease_token, "seconds" => seconds })
       end
 
+      # **The provider fragment is a lease-bound read.** The task has already been claimed, so
+      # the lease token is sent with the request; the service checks the task's own live lease and
+      # the key's `model_access` grant before releasing anything.
+      def model_access(task_id, lease_token)
+        post("/api/upgrades/agent/tasks/#{escape(task_id)}/model_access",
+          { "lease_token" => lease_token.to_s })
+      end
+
       def complete(task_id, lease_token, result:, model:, tokens_in: 0, tokens_out: 0,
-        calls: 1, seconds: 0)
-        post("/api/upgrades/agent/tasks/#{escape(task_id)}/complete", {
+        calls: 1, seconds: 0, model_credential_id: nil)
+        body = {
           "lease_token" => lease_token, "result" => result, "model" => model,
           "tokens_in" => tokens_in, "tokens_out" => tokens_out, "calls" => calls,
           "seconds" => seconds
-        })
+        }
+        body["model_credential_id"] = model_credential_id.to_s unless model_credential_id.to_s.empty?
+        post("/api/upgrades/agent/tasks/#{escape(task_id)}/complete", body)
       end
 
       def fail(task_id, lease_token, error:, retryable:, model: nil, tokens_in: 0,
-        tokens_out: 0, calls: 0, seconds: 0)
-        post("/api/upgrades/agent/tasks/#{escape(task_id)}/fail",
-          { "lease_token" => lease_token, "error" => error.to_s, "retryable" => retryable,
-            "model" => model.to_s, "tokens_in" => tokens_in.to_i,
-            "tokens_out" => tokens_out.to_i, "calls" => calls.to_i,
-            "seconds" => seconds.to_i })
+        tokens_out: 0, calls: 0, seconds: 0, model_credential_id: nil)
+        body = { "lease_token" => lease_token, "error" => error.to_s, "retryable" => retryable,
+                 "model" => model.to_s, "tokens_in" => tokens_in.to_i,
+                 "tokens_out" => tokens_out.to_i, "calls" => calls.to_i,
+                 "seconds" => seconds.to_i }
+        body["model_credential_id"] = model_credential_id.to_s unless model_credential_id.to_s.empty?
+        post("/api/upgrades/agent/tasks/#{escape(task_id)}/fail", body)
       end
 
       def release(task_id, lease_token)
