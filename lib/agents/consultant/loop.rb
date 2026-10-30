@@ -321,9 +321,8 @@ module Agents
           "calls" => calls.to_i,
           "seconds" => seconds.to_i
         }
-        # **A review POST has no credential field in this service version.** It completes its own
-        # task, so its tokens are counted, but the route does not yet accept the key id; sending
-        # one would turn a valid review into a 422.
+        payload["model_credential_id"] = model_credential_id.to_s unless
+          model_credential_id.to_s.empty?
         @client.review_answer(decision_id, answer_id, payload)
         { "answer_id" => answer_id, "verdict" => proposal["verdict"] }
       rescue Error => e

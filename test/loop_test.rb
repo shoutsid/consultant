@@ -424,6 +424,7 @@ class LoopTest < Minitest::Test
       assert_equal "a1", posted[2]
       assert_equal "safe", posted[3]["verdict"]
       assert_equal "lease-1", posted[3]["lease_token"]
+      assert_equal "cred-1", posted[3]["model_credential_id"]
       refute client.calls.any? { |call| call.first == :complete },
         "the review POST completed the task; a second complete would race it"
     end
