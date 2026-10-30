@@ -25,9 +25,10 @@ module Agents
 
       def self.empty = new(payload: {}, directory: nil)
 
-      def initialize(payload:, directory:)
+      def initialize(payload:, directory:, agents_dir: nil)
         @payload = payload.is_a?(Hash) ? payload : {}
         @directory = directory.to_s
+        @agents_dir = agents_dir.to_s
       end
 
       def available?
@@ -56,6 +57,7 @@ module Agents
         FileUtils.mkdir_p(@directory, mode: 0o700)
         %w[data cache config].each { |name| FileUtils.mkdir_p(File.join(@directory, name), mode: 0o700) }
         write_config
+        copy_agents
         yield environment
       ensure
         FileUtils.rm_rf(@directory) if available? && !@directory.empty?
@@ -81,6 +83,22 @@ module Agents
 
       def keys
         @keys ||= @payload["keys"].is_a?(Hash) ? @payload["keys"] : {}
+      end
+
+      # **The agent definitions are part of the config, and the run's config is empty.**
+      # Isolating `XDG_CONFIG_HOME` is what stops a leftover `opencode auth login` state from
+      # being read; the same isolation hid `agents/consultant.md`, so the first live consultant
+      # task failed with `Agent not found: "consultant"` *after* the service had handed over the
+      # key. They are copied rather than referenced because opencode reads agents from the config
+      # directory it is given, and the copy is removed with the rest of the directory.
+      def copy_agents
+        return if @agents_dir.empty? || !File.directory?(@agents_dir)
+
+        destination = File.join(@directory, "config", "opencode", "agents")
+        FileUtils.mkdir_p(destination, mode: 0o700)
+        Dir.glob(File.join(@agents_dir, "*.md")).each do |path|
+          FileUtils.cp(path, File.join(destination, File.basename(path)))
+        end
       end
 
       def config_path = File.join(@directory, "opencode.json")

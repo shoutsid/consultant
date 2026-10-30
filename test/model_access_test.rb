@@ -67,6 +67,31 @@ class ModelAccessTest < Minitest::Test
     end
   end
 
+  # **The run's XDG config is empty by design, and that hid the agents.** Isolating the config
+  # directory is what stops a leftover `opencode auth login` state from being read; the same
+  # isolation hid `agents/consultant.md`, so the first live consultant task failed with
+  # `Agent not found: "consultant"` after the service had already handed over the key. The
+  # definitions are copied into the run and removed with it.
+  def test_the_agent_definitions_are_copied_into_the_run_config
+    Dir.mktmpdir do |dir|
+      agents = File.join(dir, "agents")
+      Dir.mkdir(agents)
+      File.write(File.join(agents, "consultant.md"), "---\ndescription: x\n---\nthe consultant\n")
+      target = File.join(dir, "task")
+
+      access = Agents::Consultant::ModelAccess.new(payload: payload, directory: target,
+        agents_dir: agents)
+      copied = nil
+      access.with_config do |env|
+        copied = File.join(env.fetch("XDG_CONFIG_HOME"), "opencode", "agents", "consultant.md")
+        assert File.file?(copied), "the agent definition was not copied into the run's config"
+        assert_includes File.read(copied), "the consultant"
+      end
+
+      refute File.exist?(copied), "the copied definitions outlived the task"
+    end
+  end
+
   def test_an_empty_release_is_the_legacy_path_and_writes_nothing
     access = Agents::Consultant::ModelAccess.empty
 

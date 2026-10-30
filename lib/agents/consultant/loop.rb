@@ -226,7 +226,8 @@ module Agents
 
         payload = @client.model_access(task_id, lease)
         directory = @config.state_dir.join(ModelAccess::DIRECTORY, task_id)
-        ModelAccess.new(payload: payload, directory: directory)
+        ModelAccess.new(payload: payload, directory: directory,
+          agents_dir: @config.home.join(".config", "opencode", "agents"))
       rescue Error => e
         raise unless e.status == 404
 
