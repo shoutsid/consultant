@@ -99,6 +99,91 @@ module Agents
           [nil, e.message]
         end
 
+        # **A hypothesis is an experiment, and this refuses one that is not executable.** The shape
+        # is the service's scenario: two releases, the target to construct, the call to make and the
+        # one value the probe observes. The relations are the three this service can interpret — a
+        # fourth would be stored and read as `unknown`, which counts for nothing — and a program that
+        # named the same release on both sides would test nothing while looking like a claim.
+        HYPOTHESIS_RELATIONS = %w[returns_equal returns_type raises_class].freeze
+        HYPOTHESIS_ECOSYSTEMS = %w[ruby python].freeze
+        HYPOTHESIS_MAX_BYTES = 24 * 1024
+
+        def read_hypothesis(text)
+          parsed = parse(text)
+          # A model that cannot name a call says so with one field, and that is a result rather than
+          # a malformed answer: the loop reports a task that found no experiment.
+          if parsed["cannot"].to_s.strip != ""
+            return [{ "stance" => "cannot", "cannot" => parsed["cannot"].to_s[0, 2_000],
+                      "mode" => "hypothesis" }, nil]
+          end
+
+          provenance = parsed["provenance"].is_a?(Hash) ? parsed["provenance"] : {}
+          if provenance["model"].to_s.strip.empty? || provenance["prompt_version"].to_s.strip.empty?
+            return [nil, "a hypothesis needs provenance (model, prompt_version)"]
+          end
+
+          ecosystem = parsed["ecosystem"].to_s.strip.downcase
+          unless HYPOTHESIS_ECOSYSTEMS.include?(ecosystem)
+            return [nil, "a hypothesis names its ecosystem (#{HYPOTHESIS_ECOSYSTEMS.join(", ")}); " \
+                         "got #{ecosystem.inspect}"]
+          end
+          library = parsed["library"].to_s.strip
+          return [nil, "a hypothesis names the library it tests"] if library.empty?
+
+          from_version = parsed["from_version"].to_s.strip
+          to_version = parsed["to_version"].to_s.strip
+          return [nil, "a hypothesis names the two releases it compares"] if
+            from_version.empty? || to_version.empty?
+          return [nil, "a hypothesis compares two different releases; #{from_version} is on " \
+                       "both sides"] if from_version == to_version
+
+          target = parsed["target"]
+          unless target.is_a?(Hash) && target["callable"].to_s.strip != ""
+            return [nil, "a hypothesis names the callable it calls (target.callable)"]
+          end
+          return [nil, "a hypothesis names how it calls the callable (`call`)"] unless
+            parsed["call"].is_a?(Hash)
+
+          probe = parsed["probe"]
+          return [nil, "a hypothesis names what it observes (`probe`)"] unless probe.is_a?(Hash)
+
+          relation = probe["relation"].to_s
+          unless HYPOTHESIS_RELATIONS.include?(relation)
+            return [nil, "the probe's relation is #{HYPOTHESIS_RELATIONS.join(", ")}; " \
+                         "got #{relation.inspect}"]
+          end
+          if relation == "raises_class" && probe["expected"].to_s.strip.empty?
+            return [nil, "a raises_class probe names the expected exception class"]
+          end
+          return [nil, "the hypothesis carries a secret-looking value"] if secret?(parsed)
+
+          # `presence` is Active Support and this client is plain Ruby: an empty environment means
+          # "nothing beyond the interpreter", which the service reads as an absent field.
+          environment = parsed["environment"].to_s.strip[0, 2_000]
+          values = {
+            "ecosystem" => ecosystem,
+            "library" => library[0, 120],
+            "from_version" => from_version[0, 60],
+            "to_version" => to_version[0, 60],
+            "subject_kind" => parsed["subject_kind"].to_s.strip.empty? ? "package" :
+              parsed["subject_kind"].to_s[0, 40],
+            "target" => target,
+            "call" => parsed["call"],
+            "probe" => probe,
+            "setup" => Array(parsed["setup"]).grep(Hash),
+            "environment" => environment.empty? ? nil : environment,
+            "provenance" => provenance.merge("harness" => "consultant/1"),
+            "mode" => "hypothesis"
+          }.compact
+          if values.to_json.bytesize > HYPOTHESIS_MAX_BYTES
+            return [nil, "the hypothesis exceeds #{HYPOTHESIS_MAX_BYTES} bytes"]
+          end
+
+          [values, nil]
+        rescue Refusal => e
+          [nil, e.message]
+        end
+
         # A profile proposal is a field map, not an effect list. The service classifies each
         # field; this refuses the fields a model must never suggest and a secret in any value.
         # **A scan annotation is not an effect.** It says the deterministic scan missed a call

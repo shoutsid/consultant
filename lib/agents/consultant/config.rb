@@ -21,7 +21,11 @@ module Agents
           model: env["CONSULTANT_MODEL"].to_s,
           interval: env.fetch("CONSULTANT_INTERVAL", "300").to_i,
           claim_limit: env.fetch("CONSULTANT_CLAIM_LIMIT", "1").to_i,
-          kinds: env.fetch("CONSULTANT_KINDS", "answer,review,profile,scan,intent,repair,present")
+          # `hypothesis` is last because it is the one kind whose output is an experiment rather
+          # than a decision: a worker asks for it when a report has no mechanism to answer, and a
+          # deployment that leaves it out of this list simply never writes one.
+          kinds: env.fetch("CONSULTANT_KINDS",
+            "answer,review,profile,scan,intent,repair,present,hypothesis")
             .split(",").map(&:strip).reject(&:empty?),
           task_timeout: env.fetch("CONSULTANT_TASK_TIMEOUT", "600").to_i,
           opencode_binary: env.fetch("CONSULTANT_OPENCODE", "opencode"),

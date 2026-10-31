@@ -41,6 +41,10 @@ class LoopTest < Minitest::Test
     def propose_answer(id, body) = (@calls << [:answer, id, body]) && @answer
     def propose_profile(id, body) = (@calls << [:profile, id, body]) && @profile
 
+    def post_scenario(body)
+      (@calls << [:scenario, body]) && { "scenarios" => { "id" => "s1" }, "id" => "s1" }
+    end
+
     def review_answer(decision_id, answer_id, body)
       (@calls << [:review, decision_id, answer_id, body]) && { "reviewed_answer" => answer_id }
     end
@@ -420,6 +424,58 @@ class LoopTest < Minitest::Test
 
       assert_includes client.calls, [:run, "run-evidence"]
       assert client.calls.any? { |call| call.first == :complete }
+    end
+  end
+
+  # **A hypothesis's output is a claim about two releases, and the loop posts it to the one route
+  # an agent key may write.** Nothing about the report moves, which is why the assertion is on the
+  # scenario body rather than on any report result.
+  def test_a_hypothesis_task_posts_a_scenario
+    Dir.mktmpdir do |dir|
+      text = JSON.generate(
+        "ecosystem" => "python", "library" => "httpx", "from_version" => "0.27.2",
+        "to_version" => "0.28.0",
+        "target" => { "constant" => "httpx.AsyncClient", "callable" => "stream" },
+        "call" => { "arguments" => [{ "kind" => "string", "value" => "a" }] },
+        "probe" => { "relation" => "raises_class", "expected" => "TypeError" },
+        "provenance" => { "model" => "provider/model",
+                          "prompt_version" => "hypothesis-prompt-1" }
+      )
+      client = FakeClient.new
+      subject = loop(client: client, runner: FakeRunner.new(text: text), dir: dir)
+      hypothesis = task(kind: "hypothesis", question: false).merge(
+        "context" => { "report" => { "id" => "r1", "library" => "httpx",
+                                     "ecosystem" => "python", "version" => "0.28.0",
+                                     "from_version" => "0.27.2" },
+                       "note" => "no signature moved between the releases" })
+
+      subject.process(hypothesis)
+
+      posted = client.calls.find { |call| call.first == :scenario }
+      refute_nil posted, "a hypothesis must be posted as a scenario"
+      assert_equal "httpx", posted[1]["library"]
+      assert_equal "raises_class", posted[1].dig("probe", "relation")
+      refute posted[1].key?("provenance"),
+        "the scenario body refuses an extra field, so provenance stays on the task record"
+      refute client.calls.any? { |call| call.first == :answer }
+      assert client.calls.any? { |call| call.first == :complete }
+    end
+  end
+
+  # A model that cannot name a call says so; that is recorded as the task's result and posts no
+  # scenario, because a claim with no program in it would be prose in the corpus's name.
+  def test_a_hypothesis_that_names_no_call_posts_no_scenario
+    Dir.mktmpdir do |dir|
+      client = FakeClient.new
+      subject = loop(client: client,
+        runner: FakeRunner.new(text: JSON.generate("cannot" => "the report names no callable")),
+        dir: dir)
+
+      subject.process(task(kind: "hypothesis", question: false).merge("context" => { "note" => "x" }))
+
+      refute client.calls.any? { |call| call.first == :scenario }
+      rec = client.calls.find { |call| call.first == :complete }
+      assert_includes rec[2][:result]["cannot"], "names no callable"
     end
   end
 

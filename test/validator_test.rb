@@ -302,6 +302,66 @@ class ValidatorTest < Minitest::Test
     assert_includes proposal["summary"], "->"
   end
 
+  def hypothesis_text(overrides = {})
+    JSON.generate({
+      "ecosystem" => "python", "library" => "httpx",
+      "from_version" => "0.27.2", "to_version" => "0.28.0",
+      "target" => { "constant" => "httpx.AsyncClient", "callable" => "stream" },
+      "call" => { "arguments" => [{ "kind" => "string", "value" => "a" }] },
+      "probe" => { "relation" => "raises_class", "expected" => "TypeError" },
+      "provenance" => { "model" => "test/model", "prompt_version" => "hypothesis-prompt-1" }
+    }.merge(overrides))
+  end
+
+  # **The hypothesis is the one shape whose refusal is the safety rule.** A "maybe" from this
+  # client would be a task that spent a model call and stored nothing, and a claim that names the
+  # same release on both sides would test nothing while looking like knowledge.
+  def test_a_hypothesis_names_two_releases_and_a_callable
+    proposal, problem = Agents::Consultant::Validator.read_hypothesis(hypothesis_text)
+
+    assert_nil problem
+    assert_equal "hypothesis", proposal["mode"]
+    assert_equal "raises_class", proposal.dig("probe", "relation")
+    assert_equal "consultant/1", proposal["provenance"]["harness"]
+
+    proposal, problem = Agents::Consultant::Validator.read_hypothesis(
+      hypothesis_text("from_version" => "0.28.0")
+    )
+    assert_nil proposal
+    assert_match(/two different releases/, problem)
+
+    proposal, problem = Agents::Consultant::Validator.read_hypothesis(
+      hypothesis_text("target" => { "callable" => "" })
+    )
+    assert_nil proposal
+    assert_match(/callable/, problem)
+
+    proposal, problem = Agents::Consultant::Validator.read_hypothesis(
+      hypothesis_text("probe" => { "relation" => "looks_fine" })
+    )
+    assert_nil proposal
+    assert_match(/relation/, problem)
+  end
+
+  def test_a_hypothesis_that_names_no_call_is_a_result_rather_than_a_refusal
+    proposal, problem = Agents::Consultant::Validator.read_hypothesis(
+      JSON.generate("cannot" => "the report names no callable to call")
+    )
+
+    assert_nil problem
+    assert_equal "cannot", proposal["stance"]
+    assert_includes proposal["cannot"], "no callable"
+  end
+
+  def test_a_hypothesis_refuses_a_secret_in_the_program
+    proposal, problem = Agents::Consultant::Validator.read_hypothesis(
+      hypothesis_text("environment" => "API_KEY=abcdef0123456789abcdef")
+    )
+
+    assert_nil proposal
+    assert_match(/secret/, problem)
+  end
+
   def test_a_presentation_refuses_a_merge_claim_and_a_secret
     proposal, problem = Agents::Consultant::Validator.read_presentation(
       presentation_text(summary: "The suite passed and the change is safe to merge.")

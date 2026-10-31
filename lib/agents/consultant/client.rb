@@ -109,6 +109,13 @@ module Agents
         post("/api/upgrades/projects/#{escape(project_id)}/profile_proposals", body)
       end
 
+      # **The one write an agent key may perform, and the whole output of a hypothesis.** The
+      # scenario is a claim about two releases; nothing about the report changes because of it, and a
+      # person or a worker has to run it before it means anything.
+      def post_scenario(body)
+        post("/api/scenarios", body)
+      end
+
       def review_answer(decision_id, answer_id, body)
         post("/api/upgrades/decisions/#{escape(decision_id)}/answers/#{escape(answer_id)}/review",
           body)

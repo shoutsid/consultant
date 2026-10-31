@@ -92,6 +92,8 @@ module Agents
         presentation = mode == "present" ? presentation_for(task) : nil
         prompt = if mode == "present"
           Prompt.build_present(task, presentation: presentation, run: run_detail)
+        elsif mode == "hypothesis"
+          Prompt.build_hypothesis(task)
         elsif mode == "review"
           Prompt.build_review(task, question: question, run: run_detail,
             repository: repository.is_a?(Hash) ? repository : nil)
@@ -127,6 +129,7 @@ module Agents
         when "scan" then Validator.read_scan(text)
         when "review" then Validator.read_review(text)
         when "present" then Validator.read_presentation(text)
+        when "hypothesis" then Validator.read_hypothesis(text)
         else Validator.read(text, mode: mode)
         end
         if problem
@@ -144,6 +147,7 @@ module Agents
           seconds: seconds, calls: calls, tokens_in: tokens_in, tokens_out: tokens_out,
           model_credential_id: credential_id)
         when "present" then post_presentation(proposal, model: model)
+        when "hypothesis" then post_hypothesis(proposal, model: model)
         else post_answer(task, question, proposal, model: model)
         end
         if posted.is_a?(String)
@@ -348,6 +352,25 @@ module Agents
       # can read what the model said about the deterministic scan; nothing is proposed, applied or
       # turned into a question by the model. A person may create a question from it with the
       # `create_decision` tool, which is their act.
+      # **A hypothesis that names no call is a result, not a proposal.** The model answers `cannot`
+      # when the report does not say enough, and posting that as a scenario would be a claim with no
+      # program in it; the task records the sentence for a person instead.
+      def post_hypothesis(proposal, model:)
+        return { "cannot" => proposal["cannot"].to_s } if proposal["stance"] == "cannot"
+
+        body = {
+          "ecosystem" => proposal["ecosystem"], "library" => proposal["library"],
+          "from_version" => proposal["from_version"], "to_version" => proposal["to_version"],
+          "target" => proposal["target"], "call" => proposal["call"],
+          "probe" => proposal["probe"]
+        }
+        body["subject_kind"] = proposal["subject_kind"] if proposal["subject_kind"].to_s != ""
+        setup = Array(proposal["setup"])
+        body["setup"] = setup if setup.any?
+        body["environment"] = proposal["environment"] if proposal["environment"].to_s != ""
+        @client.post_scenario(body)
+      end
+
       def post_scan(proposal)
         {
           "annotations" => Array(proposal["annotations"]),
