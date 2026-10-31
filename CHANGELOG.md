@@ -7,6 +7,11 @@ its image and its command line.
 
 ### Changed
 
+- **The auxiliary model is pinned to the task's model.** opencode generates a session title
+  before the first answer, and left unset it used its own small model — measured on the live
+  walk as `google/gemini-3.8-flash` under the account's provider while the chain named deepseek.
+  A title is a call on the account's key, so the generated config now sets `small_model` to the
+  model the service released. The spend record cannot show a model the client did not ask for.
 - The project is **Agents**. The client is `agents-consultant`, the namespace is
   `Agents::Consultant`, the environment variables use the `AGENTS_` prefix, and the image tags use
   `agents-consultant`. The old names are not read or accepted. The prompt changes with the rename,

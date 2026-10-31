@@ -63,11 +63,20 @@ module Agents
         FileUtils.rm_rf(@directory) if available? && !@directory.empty?
       end
 
+      # **The small model is pinned too, because a title call is a model call and it was not
+      # the one the chain named.** Measured on the live consultant's neighbour: opencode opened
+      # every repair session with `providerID=nano-gpt modelID=google/gemini-3.8-flash
+      # small=true agent=title` — a title generated on the account's key by opencode's own
+      # default, while the repair chain named deepseek and the spend row recorded deepseek. The
+      # lease released the providers for a chain; a model outside it reaching the provider is a
+      # call the account did not choose and the record did not show. `small_model` is opencode's
+      # one override for the auxiliary calls, so it is set to the model the service chose.
       def document
         {
           "$schema" => SCHEMA,
           "autoupdate" => false,
           "snapshot" => false,
+          "small_model" => small_model,
           "provider" => providers.each_with_object({}) do |(slug, fragment), result|
             key = keys[slug]
             result[slug] = provider_entry(fragment, key) if key.is_a?(Hash)
@@ -76,6 +85,11 @@ module Agents
       end
 
       private
+
+      def small_model
+        chosen = @payload["model"].to_s
+        chosen.empty? ? chain.first.to_s : chosen
+      end
 
       def providers
         @providers ||= @payload["providers"].is_a?(Hash) ? @payload["providers"] : {}
