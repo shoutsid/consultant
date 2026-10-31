@@ -19,6 +19,10 @@ its image and its command line.
 
 ### Added
 
+- **A record keeps the model's raw output, not only its hash.** The replay gate could score the
+  two kinds whose cases were written by hand and no other, because a record named the answer's
+  bytes without keeping them. The text is written 0600 into a 0700 `records` directory; the prompt
+  is still represented only by its hash.
 - `present` mode: the lead of a delivered pull request, written from the run's fact sheet, the
   deterministic body and the project's accepted review guide. It returns a summary and typed
   review-focus anchors; the service checks them, and the walker applies the validated block only

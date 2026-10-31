@@ -127,9 +127,18 @@ class LoopTest < Minitest::Test
       assert_equal "answer", posted[2]["stance"]
       assert_equal "app/models/user.rb", posted[2]["effects"].first["payload"]["path"]
       assert client.calls.any? { |call| call.first == :complete }
-      assert File.exist?(File.join(dir, "records", "task-1.json"))
-      refute_includes File.read(File.join(dir, "records", "task-1.json")), "What should happen?",
+      path = File.join(dir, "records", "task-1.json")
+      assert File.exist?(path)
+      refute_includes File.read(path), "What should happen?",
         "the record stores a prompt hash, not the prompt"
+      # **The answer is kept so a bundle can be built from it.** The gate cannot record a kind it
+      # only has a hash for; the text is written 0600 because it is untrusted model output.
+      record = JSON.parse(File.read(path))
+      assert_equal "answer", JSON.parse(record.fetch("output"))["stance"]
+      assert_equal record["output"].bytesize, record["output_bytes"]
+      assert_equal Digest::SHA256.hexdigest(record["output"]), record["output_sha256"]
+      assert_equal 0o600, File.stat(path).mode & 0o777
+      assert_equal 0o700, File.stat(File.dirname(path)).mode & 0o777
     end
   end
 

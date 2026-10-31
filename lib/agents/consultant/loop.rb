@@ -414,14 +414,21 @@ module Agents
         [nil, last_error || ModelError.new("the model chain produced no answer"), nil, chain.last, calls]
       end
 
+      # **The output is kept, not only its hash.** A record that named the model's bytes but not
+      # the bytes made a replay bundle impossible to build: the gate could score the two kinds whose
+      # cases were written by hand, and the other five had nothing to replay. The text is the
+      # untrusted model answer, so it is written 0600 into a 0700 directory rather than left at the
+      # default the process umask happens to give it — a record is read by an operator, not by
+      # every process in the container.
       def record(task, prompt:, text:, result: nil, error: nil, model: nil, usage: nil)
-        @config.records_dir.mkpath
+        @config.records_dir.mkpath(mode: 0o700)
         path = @config.records_dir.join("#{task['id']}.json")
         document = {
           "task_id" => task["id"].to_s,
           "kind" => task["kind"].to_s,
           "model" => model.to_s,
           "prompt_sha256" => Digest::SHA256.hexdigest(prompt.to_s),
+          "output" => text.to_s,
           "output_sha256" => Digest::SHA256.hexdigest(text.to_s),
           "output_bytes" => text.to_s.bytesize,
           "result" => result,
@@ -430,7 +437,10 @@ module Agents
           "recorded_at" => @clock.now.utc.iso8601
         }
         temp = "#{path}.tmp"
-        File.write(temp, JSON.pretty_generate(document))
+        File.open(temp, File::WRONLY | File::CREAT | File::TRUNC, 0o600) do |file|
+          file.write(JSON.pretty_generate(document))
+        end
+        File.chmod(0o600, temp)
         File.rename(temp, path)
       rescue SystemCallError => e
         log("could not write the record for #{task['id']}: #{e.message}")
@@ -453,8 +463,9 @@ module Agents
         sleep(seconds) if seconds.positive?
       end
 
-      # Raw model text is not stored (the record keeps hashes), so a live refusal is impossible to
-      # diagnose from the service alone. This is opt-in for an operator running a probe by hand.
+      # The record now keeps the raw answer, but a live refusal can still happen before the record
+      # is written (a killed process), so the text is also available on stderr when an operator asks
+      # for it. This is opt-in for a probe run by hand.
       def debug(message, text)
         return unless %w[1 true yes].include?(@config.env["CONSULTANT_DEBUG"].to_s.downcase)
 
