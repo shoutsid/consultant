@@ -99,7 +99,7 @@ module Agents
           Prompt.build(task, mode: mode,
             repository: repository.is_a?(Hash) ? repository : nil, run: run_detail)
         end
-        model_chain = mode == "review" ? review_model_chain_for(task) : model_chain_for(task)
+        model_chain = model_chain_for(task, mode: mode)
         started = @clock.now
         agent = if mode == "review"
           @config.review_agent
@@ -370,20 +370,28 @@ module Agents
         log("could not report the failure for #{task_id}: #{e.message}")
       end
 
+      # **The kinds that are a different job on the same key, and so may name their own model.**
+      # A review answers yes or no over a patch, a scan reads a whole tree, and a presentation
+      # writes the longest text this client produces — a `scan_model` an account sets is a
+      # narrower spend than moving the chain its one-line answers use.
+      KINDS_WITH_OWN_MODEL = %w[review scan present].freeze
+
       # **The chain is read left to right, and the free model is first.** A project's policy may
       # name its own chain; otherwise the deployment's `CONSULTANT_MODEL` is the one. One model is
       # a one-entry chain, and an empty value leaves the choice to opencode's own configuration.
-      def model_chain_for(task)
+      #
+      # A kind's own chain wins over the general one, and the policy's value wins over the
+      # deployment's env: a project that set `scan_model` asked for that model for its scans, and a
+      # deployment default is what the account did not choose.
+      def model_chain_for(task, mode: nil)
         policy = task["policy"].is_a?(Hash) ? task["policy"] : {}
+        if KINDS_WITH_OWN_MODEL.include?(mode.to_s)
+          text = policy["#{mode}_model"].to_s
+          text = @config.public_send("#{mode}_model").to_s if text.empty?
+          return parse_models(text) unless text.empty?
+        end
         text = policy["model"].to_s
         parse_models(text.empty? ? @config.model : text)
-      end
-
-      def review_model_chain_for(task)
-        policy = task["policy"].is_a?(Hash) ? task["policy"] : {}
-        text = policy["review_model"].to_s
-        text = @config.review_model if text.empty?
-        text.empty? ? model_chain_for(task) : parse_models(text)
       end
 
       def parse_models(text) = text.to_s.split(/[,\s]+/).reject(&:empty?)

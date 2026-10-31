@@ -256,9 +256,41 @@ class LoopTest < Minitest::Test
         out: StringIO.new, err: StringIO.new)
 
       assert_equal %w[free/config paid/config], subject.send(:model_chain_for, { "policy" => {} })
+      # **A kind that is a different job may name its own chain.** The policy wins over the
+      # deployment's value, and a kind without one keeps the chain every answer uses.
       assert_equal %w[review/free review/paid],
-        subject.send(:review_model_chain_for,
-          { "policy" => { "review_model" => "review/free review/paid" } })
+        subject.send(:model_chain_for,
+          { "policy" => { "review_model" => "review/free review/paid" } }, mode: "review")
+      assert_equal %w[scan/free scan/paid],
+        subject.send(:model_chain_for,
+          { "policy" => { "scan_model" => "scan/free scan/paid" } }, mode: "scan")
+      assert_equal %w[free/config paid/config],
+        subject.send(:model_chain_for, { "policy" => { "scan_model" => "scan/one" } }, mode: "intent")
+    end
+  end
+
+  def test_a_presentation_reads_its_own_model_setting_and_falls_back_to_the_chain
+    Dir.mktmpdir do |dir|
+      config = Agents::Consultant::Config.new(
+        base_url: "http://service:8001", key: "afy_x",
+        model: "free/config", interval: 0, claim_limit: 1, kinds: %w[present],
+        task_timeout: 60, opencode_binary: "true", agent: "consultant",
+        present_model: "present/deployment", home: dir
+      )
+      subject = Agents::Consultant::Loop.new(client: FakeClient.new,
+        runner: FakeRunner.new(text: answer_text), config: config,
+        out: StringIO.new, err: StringIO.new)
+
+      # The deployment's per-kind value, when the project names none.
+      assert_equal %w[present/deployment],
+        subject.send(:model_chain_for, { "policy" => {} }, mode: "present")
+      # The project's own value wins over the deployment's.
+      assert_equal %w[present/project],
+        subject.send(:model_chain_for, { "policy" => { "present_model" => "present/project" } },
+          mode: "present")
+      # And a blank policy value is not an override.
+      assert_equal %w[present/deployment],
+        subject.send(:model_chain_for, { "policy" => { "present_model" => "" } }, mode: "present")
     end
   end
 

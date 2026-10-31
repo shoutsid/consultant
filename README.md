@@ -98,8 +98,12 @@ The service's `Upgrade::AgentPolicy` is authoritative: a project may narrow its 
 not widen it, the default is `off`, and consent precedes the first task.
 
 `review` is a second agent, not a second container. `CONSULTANT_REVIEW_AGENT` names the reviewer
-(the image writes `reviewer.md` beside `consultant.md`), `CONSULTANT_REVIEW_MODEL` optionally names
-another model, and the service refuses a review whose provenance names the proposer's agent. The
+(the image writes `reviewer.md` beside `consultant.md`), and the service refuses a review whose
+provenance names the proposer's agent. Three kinds may name their own model rather than the
+account's chain — `CONSULTANT_REVIEW_MODEL`, `CONSULTANT_SCAN_MODEL` and `CONSULTANT_PRESENT_MODEL`
+— because a review answers yes or no, a scan reads a whole tree and a presentation writes the longest
+text here; a project's `review_model`/`scan_model`/`present_model` policy wins over the deployment's
+value, and an empty one keeps the kind on the chain every answer uses. The
 review prompt is `reviewer-prompt-2`; the proposer is `consultant-prompt-6`. The reviewer reads the
 proposal's effects, the failed run's patch and the profile, and a `safe` verdict still only lets the
 account's policy accept provisionally — the next run is the verification.

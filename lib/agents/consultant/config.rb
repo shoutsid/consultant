@@ -11,8 +11,8 @@ module Agents
     # a project's policy may name a narrower one, and the service's task is the authority.
     class Config
       attr_reader :base_url, :key, :model, :interval, :claim_limit, :kinds, :task_timeout,
-        :opencode_binary, :agent, :review_agent, :present_agent, :review_model, :home, :state_dir,
-        :records_dir, :env
+        :opencode_binary, :agent, :review_agent, :present_agent, :review_model, :scan_model,
+        :present_model, :home, :state_dir, :records_dir, :env
 
       def self.from_env(env = ENV)
         new(
@@ -29,6 +29,8 @@ module Agents
           review_agent: env.fetch("CONSULTANT_REVIEW_AGENT", "reviewer"),
           present_agent: env.fetch("CONSULTANT_PRESENT_AGENT", "presenter"),
           review_model: env.fetch("CONSULTANT_REVIEW_MODEL", "").to_s,
+          scan_model: env.fetch("CONSULTANT_SCAN_MODEL", "").to_s,
+          present_model: env.fetch("CONSULTANT_PRESENT_MODEL", "").to_s,
           home: env.fetch("CONSULTANT_HOME", File.expand_path("~")),
           env: env
         )
@@ -36,7 +38,7 @@ module Agents
 
       def initialize(base_url:, key:, model:, interval:, claim_limit:, kinds:, task_timeout:,
         opencode_binary:, agent:, review_agent: "reviewer", present_agent: "presenter",
-        review_model: "", home:, env: ENV)
+        review_model: "", scan_model: "", present_model: "", home:, env: ENV)
         @base_url = base_url.to_s
         @key = key.to_s
         @model = model.to_s
@@ -49,6 +51,8 @@ module Agents
         @review_agent = review_agent.to_s
         @present_agent = present_agent.to_s
         @review_model = review_model.to_s
+        @scan_model = scan_model.to_s
+        @present_model = present_model.to_s
         @home = Pathname.new(home.to_s)
         @env = env
         @state_dir = @home.join("state")
