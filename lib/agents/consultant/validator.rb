@@ -184,6 +184,80 @@ module Agents
           [nil, e.message]
         end
 
+        # **A documented change is a reading of a release's own words, and this refuses one that
+        # cannot be checked.** Every extraction must carry the quote it came from and a `kind` the
+        # service declares; the service validates the same shape again on the way in. Nothing here is
+        # an effect: a documented change annotates a read and drives the miner, and it never moves a
+        # report's status, trust or counters.
+        DOCUMENTED_KINDS = %w[deprecation removal rename move default_changed behaviour_changed
+          dependency security other].freeze
+        DOCUMENTED_MAX_ITEMS = 100
+        DOCUMENTED_DETAIL_CHARS = 2_000
+        DOCUMENTED_QUOTE_CHARS = 2_000
+
+        def read_extract(text)
+          parsed = parse(text)
+          if parsed["cannot"].to_s.strip != ""
+            return [{ "stance" => "cannot", "cannot" => parsed["cannot"].to_s[0, 2_000],
+                      "mode" => "extract" }, nil]
+          end
+
+          provenance = parsed["provenance"].is_a?(Hash) ? parsed["provenance"] : {}
+          if provenance["model"].to_s.strip.empty? || provenance["prompt_version"].to_s.strip.empty?
+            return [nil, "an extraction needs provenance (model, prompt_version)"]
+          end
+
+          ecosystem = parsed["ecosystem"].to_s.strip.downcase
+          unless HYPOTHESIS_ECOSYSTEMS.include?(ecosystem)
+            return [nil, "an extraction names its ecosystem (#{HYPOTHESIS_ECOSYSTEMS.join(", ")}); " \
+                         "got #{ecosystem.inspect}"]
+          end
+          library = parsed["library"].to_s.strip
+          return [nil, "an extraction names the library whose notes it read"] if library.empty?
+
+          version = parsed["version"].to_s.strip
+          return [nil, "an extraction names the release whose notes it read"] if version.empty?
+
+          raw = parsed["changes"]
+          return [nil, "an extraction carries a `changes` list"] unless raw.is_a?(Array)
+          return [nil, "an extraction carries at most #{DOCUMENTED_MAX_ITEMS} changes"] if
+            raw.length > DOCUMENTED_MAX_ITEMS
+
+          changes = raw.each_with_index.map do |item, index|
+            raise Refusal, "change #{index} is not an object" unless item.is_a?(Hash)
+
+            kind = item["kind"].to_s
+            unless DOCUMENTED_KINDS.include?(kind)
+              raise Refusal, "change #{index}'s kind is one of #{DOCUMENTED_KINDS.join(", ")}; " \
+                             "got #{kind.inspect}"
+            end
+            quote = item["quote"].to_s.strip
+            raise Refusal, "change #{index} carries no quote; an extraction nobody can check " \
+                           "is not one" if quote.empty?
+
+            {
+              "kind" => kind,
+              "subject" => blank(item["subject"], 200),
+              "replacement" => blank(item["replacement"], 200),
+              "detail" => blank(item["detail"], DOCUMENTED_DETAIL_CHARS),
+              "quote" => quote[0, DOCUMENTED_QUOTE_CHARS],
+              "confidence" => confidence(item["confidence"])
+            }.compact
+          end
+          return [nil, "the extraction carries a secret-looking value"] if secret?(parsed)
+
+          [{
+            "ecosystem" => ecosystem, "library" => library[0, 120], "version" => version[0, 60],
+            "changes" => changes,
+            "extracted_by" => provenance["model"].to_s[0, 120],
+            "prompt_hash" => provenance["prompt_version"].to_s[0, 64],
+            "provenance" => provenance.merge("harness" => "consultant/1"),
+            "mode" => "extract"
+          }, nil]
+        rescue Refusal => e
+          [nil, e.message]
+        end
+
         # A profile proposal is a field map, not an effect list. The service classifies each
         # field; this refuses the fields a model must never suggest and a secret in any value.
         # **A scan annotation is not an effect.** It says the deterministic scan missed a call
@@ -452,6 +526,23 @@ module Agents
           return true if text.match?(/\b(SECRET_KEY_BASE|PASSWORD|PASSWD|API_KEY|ACCESS_TOKEN)\s*[:=]\s*["']?[A-Za-z0-9+\/=_-]{16,}/i)
 
           false
+        end
+
+        # A short string or nil: an empty field is absence, not an empty value. Used by the
+        # extraction reader, where a sentence about a default names no subject.
+        def blank(value, limit)
+          text = value.to_s.strip
+          text.empty? ? nil : text[0, limit]
+        end
+
+        # The model's own confidence, clamped to the unit interval; absent stays absent. It is
+        # stored as a claim and never as a verdict.
+        def confidence(value)
+          return nil if value.nil?
+
+          Float(value).clamp(0.0, 1.0)
+        rescue ArgumentError, TypeError
+          nil
         end
 
         private

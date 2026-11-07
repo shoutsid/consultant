@@ -17,7 +17,7 @@ file.
 |---|---|---|
 | `CONSULTANT_INTERVAL` | `300` | Seconds between polls when no task is claimable. |
 | `CONSULTANT_CLAIM_LIMIT` | `1` | Tasks per claim, clamped to 1–5. |
-| `CONSULTANT_KINDS` | `answer,review,profile,scan,intent,repair,present` | Task kinds this container accepts. |
+| `CONSULTANT_KINDS` | `answer,review,profile,scan,intent,repair,present,hypothesis,extract` | Task kinds this container accepts. |
 | `CONSULTANT_TASK_TIMEOUT` | `600` | Seconds one model run may take, clamped to 60–3600. |
 | `CONSULTANT_OPENCODE` | `opencode` | The model binary. |
 | `CONSULTANT_AGENT` | `consultant` | The OpenCode agent for a proposal. |

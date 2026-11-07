@@ -25,7 +25,7 @@ module Agents
           # than a decision: a worker asks for it when a report has no mechanism to answer, and a
           # deployment that leaves it out of this list simply never writes one.
           kinds: env.fetch("CONSULTANT_KINDS",
-            "answer,review,profile,scan,intent,repair,present,hypothesis")
+            "answer,review,profile,scan,intent,repair,present,hypothesis,extract")
             .split(",").map(&:strip).reject(&:empty?),
           task_timeout: env.fetch("CONSULTANT_TASK_TIMEOUT", "600").to_i,
           opencode_binary: env.fetch("CONSULTANT_OPENCODE", "opencode"),

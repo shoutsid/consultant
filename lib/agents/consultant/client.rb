@@ -116,6 +116,13 @@ module Agents
         post("/api/scenarios", body)
       end
 
+      # **The documented half, posted as a reading.** An extraction is a proposal about a release's
+      # own words: it moves no report, no status and no trust, and the service validates the shape
+      # again on the way in.
+      def post_documented_changes(body)
+        post("/api/releases/documented", body)
+      end
+
       def review_answer(decision_id, answer_id, body)
         post("/api/upgrades/decisions/#{escape(decision_id)}/answers/#{escape(answer_id)}/review",
           body)

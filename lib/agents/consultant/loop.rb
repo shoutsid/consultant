@@ -76,7 +76,7 @@ module Agents
         # key only while this task's lease is live; a fetch at startup would be a fetch for no task
         # and a key held longer than the work.
         access = model_access_for(task_id, lease)
-        repository, repository_problem = if mode == "present"
+        repository, repository_problem = if %w[present hypothesis extract].include?(mode)
           [nil, nil]
         else
           repository_for(task, mode, question)
@@ -94,6 +94,8 @@ module Agents
           Prompt.build_present(task, presentation: presentation, run: run_detail)
         elsif mode == "hypothesis"
           Prompt.build_hypothesis(task)
+        elsif mode == "extract"
+          Prompt.build_extract(task)
         elsif mode == "review"
           Prompt.build_review(task, question: question, run: run_detail,
             repository: repository.is_a?(Hash) ? repository : nil)
@@ -130,6 +132,7 @@ module Agents
         when "review" then Validator.read_review(text)
         when "present" then Validator.read_presentation(text)
         when "hypothesis" then Validator.read_hypothesis(text)
+        when "extract" then Validator.read_extract(text)
         else Validator.read(text, mode: mode)
         end
         if problem
@@ -148,6 +151,7 @@ module Agents
           model_credential_id: credential_id)
         when "present" then post_presentation(proposal, model: model)
         when "hypothesis" then post_hypothesis(proposal, model: model)
+        when "extract" then post_extract(proposal, model: model)
         else post_answer(task, question, proposal, model: model)
         end
         if posted.is_a?(String)
@@ -369,6 +373,30 @@ module Agents
         body["setup"] = setup if setup.any?
         body["environment"] = proposal["environment"] if proposal["environment"].to_s != ""
         @client.post_scenario(body)
+      end
+
+      # **A documented change is a proposal, not evidence.** The extraction is posted to the
+      # documented-changes route, which validates the same shape again; nothing about a report, a
+      # status or a trust number moves because of it. A model that cannot read a change out of the
+      # document answers `cannot`, and the task records the sentence for a person.
+      #
+      # **The identity and the provenance travel on every item, not once at the top.** The service's
+      # reader is a batch of self-contained rows — `ecosystem`, `library` and `version` are columns
+      # on `documented_changes`, and `extracted_by`/`prompt_hash` are the provenance the plan
+      # requires to travel — so a top-level identity would be a shape the service refuses. The
+      # validator already carries the model's `provenance`; this is where it is spread onto each
+      # change.
+      def post_extract(proposal, model:)
+        return { "cannot" => proposal["cannot"].to_s } if proposal["stance"] == "cannot"
+
+        changes = Array(proposal["changes"]).map do |change|
+          change.merge(
+            "ecosystem" => proposal["ecosystem"], "library" => proposal["library"],
+            "version" => proposal["version"],
+            "extracted_by" => proposal["extracted_by"], "prompt_hash" => proposal["prompt_hash"]
+          ).compact
+        end
+        @client.post_documented_changes({ "changes" => changes })
       end
 
       def post_scan(proposal)

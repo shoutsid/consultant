@@ -362,6 +362,32 @@ class ValidatorTest < Minitest::Test
     assert_match(/secret/, problem)
   end
 
+  # **An extraction with no quote is a claim nobody can check.** The client gate refuses it before
+  # it is posted, and the service validates the same rule again on the way in.
+  def test_an_extraction_with_no_quote_is_refused
+    proposal, problem = Agents::Consultant::Validator.read_extract(JSON.generate(
+      "ecosystem" => "ruby", "library" => "rails", "version" => "7.1.6",
+      "changes" => [{ "kind" => "removal", "subject" => "before_filter", "quote" => "" }],
+      "provenance" => { "model" => "provider/model", "prompt_version" => "extract-prompt-1" }
+    ))
+
+    assert_nil proposal
+    assert_match(/quote/, problem)
+  end
+
+  def test_an_extraction_reads_a_documented_change_and_its_quote
+    proposal, problem = Agents::Consultant::Validator.read_extract(JSON.generate(
+      "ecosystem" => "ruby", "library" => "rails", "version" => "7.1.6",
+      "changes" => [{ "kind" => "removal", "subject" => "before_filter",
+                      "quote" => "`before_filter` was removed.", "confidence" => 0.9 }],
+      "provenance" => { "model" => "provider/model", "prompt_version" => "extract-prompt-1" }
+    ))
+
+    assert_nil problem
+    assert_equal "extract", proposal["mode"]
+    assert_equal 0.9, proposal.fetch("changes").first.fetch("confidence")
+  end
+
   def test_a_presentation_refuses_a_merge_claim_and_a_secret
     proposal, problem = Agents::Consultant::Validator.read_presentation(
       presentation_text(summary: "The suite passed and the change is safe to merge.")

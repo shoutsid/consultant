@@ -45,6 +45,10 @@ class LoopTest < Minitest::Test
       (@calls << [:scenario, body]) && { "scenarios" => { "id" => "s1" }, "id" => "s1" }
     end
 
+    def post_documented_changes(body)
+      (@calls << [:documented, body]) && { "recorded" => Array(body["changes"]).length }
+    end
+
     def review_answer(decision_id, answer_id, body)
       (@calls << [:review, decision_id, answer_id, body]) && { "reviewed_answer" => answer_id }
     end
@@ -476,6 +480,44 @@ class LoopTest < Minitest::Test
       refute client.calls.any? { |call| call.first == :scenario }
       rec = client.calls.find { |call| call.first == :complete }
       assert_includes rec[2][:result]["cannot"], "names no callable"
+    end
+  end
+
+  # **An extraction's output is a reading of a release's own words, and the loop posts it to the
+  # documented-changes route.** Nothing about a report moves, which is why the assertion is on the
+  # extraction body rather than on any report result.
+  def test_an_extract_task_posts_documented_changes
+    Dir.mktmpdir do |dir|
+      text = JSON.generate(
+        "ecosystem" => "ruby", "library" => "rails", "version" => "7.1.6",
+        "changes" => [
+          { "kind" => "removal", "subject" => "before_filter",
+            "quote" => "`before_filter` was removed.", "detail" => "The callback was removed." }
+        ],
+        "provenance" => { "model" => "provider/model", "prompt_version" => "extract-prompt-1" }
+      )
+      client = FakeClient.new
+      subject = loop(client: client, runner: FakeRunner.new(text: text), dir: dir)
+      extract = task(kind: "extract", question: false).merge(
+        "context" => { "note" => { "ecosystem" => "ruby", "library" => "rails",
+                                   "version" => "7.1.6", "source" => "gem:CHANGELOG.md",
+                                   "body" => "## 7.1.6\n\n- `before_filter` was removed." } })
+
+      subject.process(extract)
+
+      posted = client.calls.find { |call| call.first == :documented }
+      refute_nil posted, "an extraction must be posted to the documented-changes route"
+      # **The identity and provenance travel on each item, not once at the top.** The service's
+      # reader is a batch of self-contained rows, so this is the shape it accepts.
+      item = posted[1].fetch("changes").first
+      assert_equal "rails", item.fetch("library")
+      assert_equal "7.1.6", item.fetch("version")
+      assert_equal "provider/model", item.fetch("extracted_by")
+      assert_equal "extract-prompt-1", item.fetch("prompt_hash")
+      assert_equal "removal", item.fetch("kind")
+      refute posted[1].key?("library"), "the identity is on the item, not the envelope"
+      refute client.calls.any? { |call| call.first == :answer }
+      assert client.calls.any? { |call| call.first == :complete }
     end
   end
 
