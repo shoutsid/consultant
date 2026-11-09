@@ -4,7 +4,7 @@
 # standard library. The service it talks to is another container; the only secret it holds is the
 # agent key compose gives it, and the model provider's credential is mounted in its home rather than
 # baked into a layer.
-FROM ruby:3.3.12-slim
+FROM ruby:4.0.0-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates git nodejs npm \
